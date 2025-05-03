@@ -1,0 +1,3 @@
+[submodule "src/printtool/MiLibrerias"]
+	path = src/printtool/MiLibrerias
+	url = https://github.com/chepecarlos/MiLibrerias

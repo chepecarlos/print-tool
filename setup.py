@@ -27,7 +27,7 @@ setup(
     long_description_content_type="text/markdown",
     python_requires=">=3.8",
     entry_points={"console_scripts": [
-        "printtool-cli = printtool.printtool:main"
+        "printtool-cli = printtool.main:main"
         ]},
     include_package_data = True,
     package_data = {
