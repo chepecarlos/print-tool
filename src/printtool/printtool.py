@@ -2,6 +2,7 @@ from nicegui import ui
 import codecs
 import re
 import os
+from printtool.MiLibrerias import ObtenerArchivo
 
 class printtool:
     def __init__(self):
@@ -103,49 +104,179 @@ class printtool:
                 file['valor'] = f"{int(self.totalHoras)}h {minutos}m"
         
         self.tablaInfo.update()
+        self.calcularCostos()
+        
+    def calcularCostos(self):
+        """Calcular costos"""
+        
+        data = ObtenerArchivo("data/costos.md") 
+        dataExtras = ObtenerArchivo("costos.md", False)
+        dataVentas = ObtenerArchivo("ventas.md", False)
+        
+        costoExtras = 0
+        for extra in dataExtras:
+            costoExtras += float(dataExtras[extra])
+            
+        tiempoEnsamblaje = float(dataVentas.get("tiempoEnsamblaje"))
+        horaTrabajo = float(data.get("hora_trabajo"))
+        costoEmsanblado = (tiempoEnsamblaje/60) * horaTrabajo
+        
+        costoGramo = float(data.get("precio_filamento"))/1000
+        
+        costoFilamento = self.totalGramos * costoGramo
+        costoEficiencia =costoFilamento * float(data.get("eficiencia_material"))/100
+        
+        costoImpresora = int(data.get("costo_impresora"))
+        envioImpresora = int(data.get("envio_impresora"))
+        mantenimientoImpresora = int(data.get("mantenimiento_impresora"))
+        vidaUtil = int(data.get("vida_util"))
+        tiempoTrabajo = (int(data.get("tiempo_trabajo"))/100) * 8760
+        consumoPotencia = int(data.get("consumo"))
+        costoElectricidad = float(data.get("costo_electricidad"))
+        errorFabricacion = float(data.get("error_fabricacion"))/100
+        
+        costoTotalImpresora = costoImpresora + envioImpresora + mantenimientoImpresora * vidaUtil
+        
+        costoRecuperacionInversion = costoTotalImpresora /(tiempoTrabajo * vidaUtil)
+        costoHora = (consumoPotencia/1000) *costoElectricidad
+        costoHoraImpresion = (costoRecuperacionInversion +costoHora)*(1+errorFabricacion)
+        
+        print(f"costo extras: {costoExtras}")
+        print(f"costo hora impresión: {costoHoraImpresion:.2f}")
+        print(f"Precio por gramo: {costoGramo}")
+        
+        costoHoraImpresion = costoHoraImpresion * self.totalHoras
+        self.costoTotal = costoFilamento + costoEficiencia + costoHoraImpresion + costoEmsanblado + costoExtras
+        
+        for data in self.tablaCostos.rows:
+            if data['nombre'] == "Total filamento (g)":
+                data['valor'] = f"{self.totalGramos}g"
+            elif data['nombre'] == "Tiempo  Ensamblaje (m)":
+                data['valor'] = f"{int(tiempoEnsamblaje)} m"
+            elif data['nombre'] == "Costo Material":
+                data['valor'] = f"${costoFilamento:.2f}"
+            elif data['nombre'] == "Eficiencia filamento":
+                data['valor'] = f"${costoEficiencia:.2f}"
+            elif data['nombre'] == "Costo de impresión hora":
+                data['valor'] = f"${costoHoraImpresion:.2f}"
+            elif data['nombre'] == "Costo ensamblado":
+                data['valor'] = f"${costoEmsanblado:.2f}"
+            elif data['nombre'] == "Costo Extra":
+                data['valor'] = f"${costoExtras:.2f}"
+            elif data['nombre'] == "Cantidad":
+                data['valor'] = 1
+            elif data['nombre'] == "Costo total":
+                data['valor'] = f"${self.costoTotal:.2f}"
         
     def mostarModelos(self):
+        
 
-            infoBásica = [
-                {'name': 'nombre', 'label': 'Nombre', 'field': 'nombre',
+        infoBásica = [
+            {'name': 'nombre', 'label': 'Nombre', 'field': 'nombre',
+            'required': True, 'align': 'left'},
+            {'name': 'valor', 'label': 'Referencia', 'field': 'valor',
+            'required': True, 'align': 'center'},
+        ]
+
+        dataCostos = [
+            {'nombre': 'Total filamento (g)', 'valor': 0},
+            {'nombre': 'Tiempo  Ensamblaje (m)', 'valor': 0},
+            {'nombre': 'Costo Material', 'valor': 0},
+            {'nombre': 'Eficiencia filamento', 'valor': 0},
+            {'nombre': 'Costo de impresión hora', 'valor': 0},
+            {"nombre": "Costo ensamblado", "valor": 0},
+            {'nombre': 'Costo Extra', 'valor': 0},
+            {'nombre': 'Cantidad', 'valor': 1},
+            {"nombre": "Costo total", "valor": 0},
+        ]
+        self.tablaCostos = ui.table(columns=infoBásica, rows=dataCostos, row_key='nombre')
+
+        self.dataArchivos()
+        
+        self.costosExtras()
+
+    def costosExtras(self):
+        ui.label('Costos Extras')
+        
+        infoCostos = [
+            {'name': 'nombre', 'label': 'Nombre', 'field': 'nombre',
                 'required': True, 'align': 'left'},
-                {'name': 'valor', 'label': 'Referencia', 'field': 'valor',
+            {'name': 'valor', 'label': 'Referencia', 'field': 'valor',
                 'required': True, 'align': 'center'},
-            ]
+        ]
+        
+        dataExtras = ObtenerArchivo("costos.md", False)
+        
+        dataCostos = []
+        
+        for extra in dataExtras:
+            dataCostos.append(
+                {'nombre': extra, 'valor': f"${dataExtras[extra]}"}
+            )
 
-            dataCostos = [
-                {'nombre': 'Costo filamento (g)', 'valor': 0},
-                {'nombre': 'Eficiencia filamento', 'valor': 0},
-                {'nombre': 'Costo de impresión hora', 'valor': 0},
-                {"nombre": "Costo ensamblado", "valor": 0},
-                {'nombre': 'Costo Extra', 'valor': 0},
-                {'nombre': 'Cantidad', 'valor': 1},
-                {"nombre": "Costo total", "valor": 0},
-            ]
-            ui.table(columns=infoBásica, rows=dataCostos, row_key='nombre')
+        ui.table(columns=infoCostos, rows=dataCostos, row_key='nombre')
+        
+    def mostarPrecio(self):
+        
+        ui.label('Costo Precio')
+        print("cargando precios")
+        
+        data = ObtenerArchivo("data/costos.md") 
+        ganancia = float(data.get("ganancia"))
+        
+        
+        precioAntesIva = self.costoTotal / (1 - ganancia/100)
+        cantidadGanancia = precioAntesIva - self.costoTotal
+        iva = precioAntesIva * 0.13
+        precioSugerido = precioAntesIva + iva
+        
+        precioVenta = data.get("precio_venta")
+        if precioVenta is None:
+            precioVenta = precioSugerido
+        
+        columns = [
+            {'name': 'nombre', 'label': 'Nombre', 'field': 'nombre', 'required': True, 'align': 'left'},
+            {'name': 'valor', 'label': 'Referencia', 'field': 'valor', 'required': True, 'align': 'center'},
+            {'name': 'final', 'label': 'Final', 'field': 'final', 'required': True, 'align': 'center'},
+        ]
 
-            self.dataArchivos()
+        rows = [
+            {"nombre": "Costo fabricación", "valor":  f"${self.costoTotal:.2f}"},
+            {"nombre": "Porcentaje de Ganancia", "valor": f"{ganancia} %"},
+            {"nombre": "Ganancia", "valor": f"${cantidadGanancia:.2f}"},
+            {"nombre": "Precio antes de iva", "valor": f"${precioAntesIva:.2f}"},
+            {"nombre": "Iva", "valor": f"${iva:.2f}"},
+            {"nombre": "Costo de venta", "valor": f"${precioSugerido:.2f}", "final": f"${precioSugerido:.2f}"},
+        ]
 
-            ui.label('Costos Extras')
 
-            costoExtras = [
-                {'name': 'nombre', 'label': 'Nombre', 'field': 'nombre',
-                'required': True, 'align': 'left'},
-                {'name': 'costo unitario', 'label': 'Costo unitario', 'field': 'valor'},
-                {'name': 'cantidad', 'label': 'Cantidad', 'field': 'valor'},
-                {'name': 'total', 'label': 'Total', 'field': 'valor'},
-            ]
+        def validar_numero(value):
+            try:
+                float(value)  # Intentar convertir el valor a float
+                return None  # Si es válido, no hay error
+            except ValueError:
+                return 'No es un número válido'  # Si falla, devolver mensaje de error
 
-            ui.table(columns=costoExtras, rows=dataCostos, row_key='nombre')
+        with ui.row().props('rounded outlined dense'):
+            self.textoVenta = ui.input(label="Costo Venta",
+                    value=0,
+                    validation=validar_numero).props('rounded outlined dense')
+            ui.button('Actualizar', on_click=self.actualizarPrecios)
+
+        ui.table(columns=columns, rows=rows, row_key='nombre')
+
+    def actualizarPrecios(self):
+        print(f"Actualizar precios {self.textoVenta.value}")
 
 
     def cargarGUI(self):
         print("Cargando GUI")
         
-        with ui.tabs().classes('w-full') as tabs:
+        with ui.tabs().classes("w-full bg-teal-700 text-white").style("padding: 0px") as tabs:
             info = ui.tab('info', icon='home')
             costo = ui.tab('Costos', icon="view_in_ar")
             precio = ui.tab('Precio', icon="paid")
+        
         with ui.tab_panels(tabs, value=info).classes('w-full'):
             with ui.tab_panel(info):
                 infoBásica = [
@@ -166,48 +297,15 @@ class printtool:
                 ui.label('Información Modelo')
                 self.tablaInfo = ui.table(columns=infoBásica, rows=dataBásica, row_key='nombre')
 
-            with ui.tab_panel(costo):
+            with ui.tab_panel(costo).style("padding: 0px"):
+                with ui.scroll_area().classes("w-full h-100 border border-2 border-teal-600h").style("height: 75vh"):
 
-                ui.label('Costo Modelo')
+                    ui.label('Costo Modelo')
 
-                self.mostarModelos()
+                    self.mostarModelos()
 
             with ui.tab_panel(precio):
 
-                columns = [
-                    {'name': 'nombre', 'label': 'Nombre', 'field': 'nombre',
-                        'required': True, 'align': 'left'},
-                    {'name': 'valor', 'label': 'Referencia', 'field': 'valor',
-                        'required': True, 'align': 'center'},
-                    {'name': 'final', 'label': 'Final', 'field': 'final',
-                        'required': True, 'align': 'center'},
-                ]
-
-                rows = [
-                    {"nombre": "Costo total", "valor": 0},
-                    {"nombre": "Porcentaje de Ganancia", "valor": "30%"},
-                    {"nombre": "Ganancia", "valor": 0},
-                    {"nombre": "Precio antes de iva", "valor": 0},
-                    {"nombre": "Iva", "valor": 0},
-                    {"nombre": "Costo de venta", "valor": 0},
-                ]
-
-                ui.label('Costo Modelo')
-
-                def validar_numero(value):
-                    try:
-                        float(value)  # Intentar convertir el valor a float
-                        return None  # Si es válido, no hay error
-                    except ValueError:
-                        return 'No es un número válido'  # Si falla, devolver mensaje de error
-
-                with ui.row().props('rounded outlined dense'):
-                    ui.input(label="Costo Venta",
-                            value=0,
-                            validation=validar_numero).props('rounded outlined dense')
-                    ui.button('Actualizar', on_click=lambda: ui.notify(
-                        'You clicked me!'))
-
-                ui.table(columns=columns, rows=rows, row_key='nombre')
+                self.mostarPrecio()
 
         ui.run(native=True, window_size=(600, 800), reload=False)
