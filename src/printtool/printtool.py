@@ -9,8 +9,16 @@ from pathlib import Path
 class printtool:
 
     totalGramos: float = 0
-    # Total de Gramos de la impresión
+    # Total de gramos de la impresión
     totalHoras: float = 0
+    # Total de horas de la impresión
+
+    # Información de la impresión
+    nombreModelo: str = ""
+    # Nombre del modelo
+    linkModelo: str = ""
+    # Link del modelo
+    cantidadModelo = 1
 
     def __init__(self):
         self.totalGramos = 0
@@ -18,17 +26,15 @@ class printtool:
 
         self.precioVenta = 0
 
-        self.calcularPrecios()
-
     def calcularPrecios(self):
 
         self.folderActual = Path.cwd()
-        self.archivoCosto = os.path.join(self.folderActual, "costos.md")
+        self.archivoInfo = os.path.join(self.folderActual, "info.md")
         self.archivoExtras = os.path.join(self.folderActual, "extras.md")
 
-        print(f"Buscando en: {self.archivoCosto}")
+        print(f"Buscando en: {self.archivoInfo}")
 
-        if not os.path.exists(self.archivoCosto):
+        if not os.path.exists(self.archivoInfo):
             data = {
                 "nombre": "",
                 "link": "",
@@ -37,8 +43,8 @@ class printtool:
                 "tiempo_ensamblaje": 0,
                 "precio_venta": 0,
             }
-            SalvarArchivo(self.archivoCosto, data)
-            print(f"Creando data base de {self.archivoCosto}")
+            SalvarArchivo(self.archivoInfo, data)
+            print(f"Creando data base de {self.archivoInfo}")
 
         if not os.path.exists(self.archivoExtras):
             data = dict()
@@ -46,7 +52,7 @@ class printtool:
             print(f"Creando data base de {self.archivoExtras}")
 
         self.infoBase = ObtenerArchivo("data/costos.md")
-        self.infoCostos = ObtenerArchivo(self.archivoCosto, False)
+        self.infoCostos = ObtenerArchivo(self.archivoInfo, False)
         self.infoExtras = ObtenerArchivo("extras.md", False)
 
         print(f"Data Costos: {self.infoCostos}")
@@ -57,6 +63,11 @@ class printtool:
             for extra in self.infoExtras:
                 costoExtras += float(self.infoExtras[extra])
         print(f"Costo extras: {self.costoExtras}")
+        self.cargarInfoBasica()
+
+    def cargarInfoBasica(self):
+        self.nombreModelo = self.infoCostos.get("nombre")
+        self.linkModelo = self.infoCostos.get("link")
 
     def cargarDataGcode(self, archivo: str):
         with codecs.open(archivo, "r", encoding="utf-8", errors="ignore") as fdata:
@@ -410,22 +421,25 @@ class printtool:
             },
         ]
 
-        def validar_numero(value):
-            try:
-                float(value)  # Intentar convertir el valor a float
-                return None  # Si es válido, no hay error
-            except ValueError:
-                return "No es un número válido"  # Si falla, devolver mensaje de error
-
         with ui.row().props("rounded outlined dense"):
             self.textoVenta = ui.input(
-                label="Costo Venta", value=self.precioVenta, validation=validar_numero
+                label="Precio de Venta",
+                value=self.precioVenta,
+                validation=self.validar_numero,
             ).props("rounded outlined dense")
             ui.button("Actualizar", on_click=self.actualizarPrecios)
 
         self.tablaPrecio = ui.table(columns=columns, rows=rows, row_key="nombre")
 
         self.actualizarPrecios()
+
+    def validar_numero(self, value):
+        try:
+            float(value)  # Intentar convertir el valor a float
+            return None  # Si es válido, no hay error
+        except ValueError:
+            return "No es un número válido"
+        # Si falla, devolver mensaje de error
 
     def actualizarPrecios(self):
         print(f"Actualizar precios {self.textoVenta.value}")
@@ -458,9 +472,25 @@ class printtool:
 
     def dataModelo(self):
         ui.label("Data del modelo")
-        ui.input(label="Nombre")
-        ui.input(label="Link")
-        pass
+        self.textoNombre = ui.input(label="Nombre", value=self.nombreModelo)
+        self.textoCantidad = ui.input(
+            label="Cantidad", value=self.cantidadModelo, validation=self.validar_numero
+        )
+        self.textoLink = ui.input(
+            label="Link",
+        )
+        ui.button("Guardar", on_click=self.guardarModelo)
+
+    def guardarModelo(self):
+        self.nombreModelo = self.textoNombre.value
+        ui.notify(f"Nombre: {self.nombreModelo}")
+        SalvarValor(self.archivoInfo, "nombre", self.nombreModelo, local=False)
+
+        for file in self.tablaInfo.rows:
+            if file["nombre"] == "Nombre":
+                file["valor"] = f"{self.nombreModelo}"
+
+        self.tablaInfo.update()
 
     def cargarGUI(self):
         print("Cargando GUI")
@@ -493,7 +523,8 @@ class printtool:
                 ]
 
                 dataBásica = [
-                    {"nombre": "Nombre", "valor": "Alcancía Creeper"},
+                    {"nombre": "Nombre", "valor": self.nombreModelo},
+                    {"nombre": "Cantidad", "valor": self.cantidadModelo},
                     {"nombre": "Material", "valor": "PLA"},
                     {"nombre": "Total Filamento (g)", "valor": self.totalGramos},
                     {"nombre": "Tiempo impresión", "valor": "10 H 5 M"},
