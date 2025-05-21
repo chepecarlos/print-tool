@@ -20,6 +20,8 @@ class printtool:
     # Link del modelo
     cantidadModelo = 1
 
+    tipoProductos = ["alcansilla", "figuras", "otro"]
+
     def __init__(self):
         self.totalGramos = 0
         self.totalHoras = 0
@@ -479,14 +481,15 @@ class printtool:
 
     def dataModelo(self):
         ui.label("Data del modelo")
-        self.textoNombre = ui.input(label="Nombre", value=self.nombreModelo)
+        self.textoNombre = ui.input(label="Nombre", value=self.nombreModelo).classes('w-64')
+        self.tipoImpresion = ui.select(self.tipoProductos, label="tipo").classes('w-64')
         self.textoCantidad = ui.input(
             label="Cantidad", value=self.cantidadModelo, validation=self.validar_numero
-        )
+        ).classes('w-64')
         self.textoLink = ui.input(
             label="Link",
-        )
-        ui.button("Guardar", on_click=self.guardarModelo)
+        ).classes('w-64')
+        ui.button("Guardar", on_click=self.guardarModelo).classes('w-64')
 
     def guardarModelo(self):
         self.nombreModelo = self.textoNombre.value
