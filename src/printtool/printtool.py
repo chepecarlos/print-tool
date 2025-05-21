@@ -69,7 +69,7 @@ class printtool:
         self.nombreModelo = self.infoCostos.get("nombre")
         self.linkModelo = self.infoCostos.get("link")
 
-    def cargarDataGcode(self, archivo: str):
+    def cargarDataGcode(self, archivo: str, tipoArchivo: str):
         with codecs.open(archivo, "r", encoding="utf-8", errors="ignore") as fdata:
             info = {
                 "material": -1.0,
@@ -80,10 +80,14 @@ class printtool:
 
             data = fdata.read()
             lineas = data.split("\n")
-            primerasLineas = "\n".join(lineas[:30])
-            # print(f"Primera lineas: {primerasLineas}")
+            if tipoArchivo == ".bgcode":
+                lineasDocumento = "\n".join(lineas[:30])
+            else:
+                lineasDocumento = data
+            # print(f"Primera lineas: {lineasDocumento}")
+            # print("-"*80)
 
-            buscarImpresora = re.search(r"printer_model=.*(MMU3)", primerasLineas)
+            buscarImpresora = re.search(r"printer_model=.*(MMU3)", lineasDocumento)
 
             if buscarImpresora:
                 self.multiMaterial = True
@@ -97,7 +101,7 @@ class printtool:
                 # filament used [g]=81.79, 17.95, 41.29, 0.00, 0.00
                 buscarGramos = re.search(
                     r"filament used \[g\]=([0-9.]+), ([0-9.]+), ([0-9.]+), ([0-9.]+), ([0-9.]+)",
-                    primerasLineas,
+                    lineasDocumento,
                 )
                 if buscarGramos:
                     info["material"] = (
@@ -109,7 +113,7 @@ class printtool:
                     )
             else:
                 buscarGramos = re.search(
-                    r"filament used \[g\]=([0-9.]+)", primerasLineas
+                    r"filament used \[g\]\s?=\s?([0-9.]+)", lineasDocumento
                 )
 
                 if buscarGramos:
@@ -118,8 +122,8 @@ class printtool:
             print(f"Buscar Gramos : { info['material']}")
 
             time_match = re.search(
-                r"estimated printing time \(normal mode\)=(([0-9]+)h )?([0-9]+)m ([0-9]+)s",
-                primerasLineas,
+                r"estimated printing time \(normal mode\)\s?=\s?(([0-9]+)h )?([0-9]+)m ([0-9]+)s",
+                lineasDocumento,
             )
 
             if time_match:
@@ -135,7 +139,7 @@ class printtool:
     def dataArchivos(self):
         ui.label("Info Modelo")
 
-        sufijoArchivo = ".bgcode"
+        sufijoArchivo = (".bgcode", ".gcode")
 
         infoArchivo = [
             {
@@ -167,9 +171,12 @@ class printtool:
         for archivo in os.listdir(folderActual):
             if archivo.endswith(sufijoArchivo):
                 print(f"Archivo encontrado: {archivo}")
-                nombreArchivo = archivo.removesuffix(sufijoArchivo)
+                for subfijo in sufijoArchivo:
+                    if subfijo in archivo:
+                        tipoArchivo = subfijo
+                        nombreArchivo = archivo.removesuffix(subfijo)
                 rutaCompleta = os.path.join(folderActual, archivo)
-                dataGcode = self.cargarDataGcode(rutaCompleta)
+                dataGcode = self.cargarDataGcode(rutaCompleta, tipoArchivo)
 
                 horas = int(dataGcode["tiempo"])
                 minutos = int((dataGcode["tiempo"] - horas) * 60)
@@ -447,7 +454,7 @@ class printtool:
         preciosinIva = self.precioVenta / 1.13
         iva = self.precioVenta - preciosinIva
         ganancia = preciosinIva - self.costoTotal
-        if ganancia < 0:
+        if ganancia < 0 or preciosinIva == 0:
             porcentajeGanancia = 0
         else:
             porcentajeGanancia = (1 - (self.costoTotal / preciosinIva)) * 100
