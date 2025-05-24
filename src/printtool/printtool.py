@@ -2,7 +2,13 @@ from nicegui import ui
 import codecs
 import re
 import os
-from printtool.MiLibrerias import ObtenerArchivo, SalvarValor, SalvarArchivo
+from printtool.MiLibrerias import (
+    ObtenerArchivo,
+    SalvarValor,
+    SalvarArchivo,
+    configurarArchivo,
+    obtenerArchivoPaquete,
+)
 from pathlib import Path
 
 
@@ -20,33 +26,42 @@ class printtool:
     # Link del modelo
     cantidadModelo = 1
 
-    tipoProductos = ["alcansilla", "figuras", "otro"]
+    precioVenta = 0
+    # Precio de venta ingresado por el usuario
+
+    tipoProductos = ["alconcilla", "figuras", "otro"]
+    
+    folderProyecto: str = None
+    # Folder del proyecto
+
+    archivoInfo: str = None
+    archivoExtras: str = None
 
     def __init__(self):
         self.totalGramos = 0
         self.totalHoras = 0
-
         self.precioVenta = 0
+
+    def configurarData(self):
+
+        if self.folderProyecto is None:
+            self.folderProyecto = Path.cwd()
+        self.archivoInfo = os.path.join(self.folderProyecto, "info.md")
+        self.archivoExtras = os.path.join(self.folderProyecto, "extras.md")
+
+        dataBaseInfo = obtenerArchivoPaquete("printtool", "config/info.md")
+        if dataBaseInfo is None:
+            print("Error fatal con paquete falta info.md")
+            exit(1)
+        print(f"Data Defecto: {dataBaseInfo}")
+
+        configurarArchivo(self.archivoInfo, dataBaseInfo)
 
     def calcularPrecios(self):
 
-        self.folderActual = Path.cwd()
-        self.archivoInfo = os.path.join(self.folderActual, "info.md")
-        self.archivoExtras = os.path.join(self.folderActual, "extras.md")
+        self.configurarData()
 
         print(f"Buscando en: {self.archivoInfo}")
-
-        if not os.path.exists(self.archivoInfo):
-            data = {
-                "nombre": "",
-                "link": "",
-                "tamaño": "",
-                "costo": None,
-                "tiempo_ensamblaje": 0,
-                "precio_venta": 0,
-            }
-            SalvarArchivo(self.archivoInfo, data)
-            print(f"Creando data base de {self.archivoInfo}")
 
         if not os.path.exists(self.archivoExtras):
             data = dict()
@@ -70,6 +85,8 @@ class printtool:
     def cargarInfoBasica(self):
         self.nombreModelo = self.infoCostos.get("nombre")
         self.linkModelo = self.infoCostos.get("link")
+        self.cantidadModelo = int(self.infoCostos.get("cantidad"))
+        self.precioVenta = self.infoCostos.get("precio_venta")
 
     def cargarDataGcode(self, archivo: str, tipoArchivo: str):
         with codecs.open(archivo, "r", encoding="utf-8", errors="ignore") as fdata:
@@ -209,7 +226,7 @@ class printtool:
 
         for file in self.tablaInfo.rows:
             if file["nombre"] == "Total Filamento (g)":
-                file["valor"] = f"{self.totalGramos}g"
+                file["valor"] = f"{self.totalGramos:.2f}g"
             elif file["nombre"] == "Tiempo impresión":
                 file["valor"] = f"{int(self.totalHoras)}h {minutos}m"
 
@@ -277,7 +294,7 @@ class printtool:
 
         for data in self.tablaCostos.rows:
             if data["nombre"] == "Total filamento (g)":
-                data["valor"] = f"{self.totalGramos}g"
+                data["valor"] = f"{self.totalGramos:.2f}g"
             elif data["nombre"] == "Tiempo  Ensamblaje (m)":
                 data["valor"] = f"{int(tiempoEnsamblaje)} m"
             elif data["nombre"] == "Costo Material":
@@ -291,7 +308,7 @@ class printtool:
             elif data["nombre"] == "Costo Extra":
                 data["valor"] = f"${self.costoExtras:.2f}"
             elif data["nombre"] == "Cantidad":
-                data["valor"] = 1
+                data["valor"] = self.cantidadModelo
             elif data["nombre"] == "Costo total":
                 data["valor"] = f"${self.costoTotal:.2f}"
 
@@ -369,16 +386,14 @@ class printtool:
         print("cargando precios")
 
         data = ObtenerArchivo("data/costos.md")
-        venta = ObtenerArchivo("ventas.md", False)
         ganancia = float(data.get("ganancia"))
 
-        precioAntesIva = self.costoTotal / (1 - ganancia / 100)
-        cantidadGanancia = precioAntesIva - self.costoTotal
+        self.costoPorModelo = self.costoTotal / self.cantidadModelo
+
+        precioAntesIva = self.costoPorModelo / (1 - ganancia / 100)
+        cantidadGanancia = precioAntesIva - self.costoPorModelo
         iva = precioAntesIva * 0.13
         precioSugerido = precioAntesIva + iva
-
-        if venta is not None:
-            self.precioVenta = self.infoCostos.get("precio_venta")
 
         print(f"Precio venta: {self.precioVenta}")
         if self.precioVenta is None:
@@ -416,8 +431,8 @@ class printtool:
         rows = [
             {
                 "nombre": "Costo fabricación",
-                "valor": f"${self.costoTotal:.2f}",
-                "final": f"${self.costoTotal:.2f}",
+                "valor": f"${self.costoPorModelo:.2f}",
+                "final": f"${self.costoPorModelo:.2f}",
             },
             {"nombre": "Porcentaje de Ganancia", "valor": f"{ganancia} %"},
             {"nombre": "Ganancia", "valor": f"${cantidadGanancia:.2f}"},
@@ -451,19 +466,17 @@ class printtool:
         # Si falla, devolver mensaje de error
 
     def actualizarPrecios(self):
-        print(f"Actualizar precios {self.textoVenta.value}")
         self.precioVenta = float(self.textoVenta.value)
+        SalvarValor(self.archivoInfo, "precio_venta", self.precioVenta, local=False)
+        print(f"Actualizar precios {self.precioVenta}")
+
         preciosinIva = self.precioVenta / 1.13
         iva = self.precioVenta - preciosinIva
-        ganancia = preciosinIva - self.costoTotal
+        ganancia = preciosinIva - self.costoPorModelo
         if ganancia < 0 or preciosinIva == 0:
             porcentajeGanancia = 0
         else:
-            porcentajeGanancia = (1 - (self.costoTotal / preciosinIva)) * 100
-
-        SalvarValor(
-            "ventas.md", "precio_venta", self.precioVenta, local=False, depuracion=True
-        )
+            porcentajeGanancia = (1 - (self.costoPorModelo / preciosinIva)) * 100
 
         for valor in self.tablaPrecio.rows:
             if valor["nombre"] == "Costo de venta":
@@ -481,24 +494,37 @@ class printtool:
 
     def dataModelo(self):
         ui.label("Data del modelo")
-        self.textoNombre = ui.input(label="Nombre", value=self.nombreModelo).classes('w-64')
-        self.tipoImpresion = ui.select(self.tipoProductos, label="tipo").classes('w-64')
+        self.textoNombre = ui.input(label="Nombre", value=self.nombreModelo).classes(
+            "w-64"
+        )
+        self.tipoImpresion = ui.select(self.tipoProductos, label="tipo").classes("w-64")
         self.textoCantidad = ui.input(
             label="Cantidad", value=self.cantidadModelo, validation=self.validar_numero
-        ).classes('w-64')
+        ).classes("w-64")
         self.textoLink = ui.input(
             label="Link",
-        ).classes('w-64')
-        ui.button("Guardar", on_click=self.guardarModelo).classes('w-64')
+        ).classes("w-64")
+        ui.button("Guardar", on_click=self.guardarModelo).classes("w-64")
 
     def guardarModelo(self):
         self.nombreModelo = self.textoNombre.value
-        ui.notify(f"Nombre: {self.nombreModelo}")
+        self.cantidadModelo = int(self.textoCantidad.value)
+        ui.notify(f"Nombre: {self.nombreModelo} - {self.cantidadModelo}")
+
         SalvarValor(self.archivoInfo, "nombre", self.nombreModelo, local=False)
+        SalvarValor(
+            self.archivoInfo,
+            "cantidad",
+            self.cantidadModelo,
+            local=False,
+        )
+        # SalvarValor(self.archivoInfo, "link", self.textoLink, local=False)
 
         for file in self.tablaInfo.rows:
             if file["nombre"] == "Nombre":
                 file["valor"] = f"{self.nombreModelo}"
+            elif file["nombre"] == "Cantidad":
+                file["valor"] = f"{self.cantidadModelo}"
 
         self.tablaInfo.update()
 
@@ -536,7 +562,10 @@ class printtool:
                     {"nombre": "Nombre", "valor": self.nombreModelo},
                     {"nombre": "Cantidad", "valor": self.cantidadModelo},
                     {"nombre": "Material", "valor": "PLA"},
-                    {"nombre": "Total Filamento (g)", "valor": self.totalGramos},
+                    {
+                        "nombre": "Total Filamento (g)",
+                        "valor": f"{self.totalGramos:.2f}",
+                    },
                     {"nombre": "Tiempo impresión", "valor": "10 H 5 M"},
                     {"nombre": "Precio", "valor": "123.00$"},
                 ]
