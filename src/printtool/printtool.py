@@ -70,7 +70,7 @@ class printtool:
 
         self.infoBase = ObtenerArchivo("data/costos.md")
         self.infoCostos = ObtenerArchivo(self.archivoInfo, False)
-        self.infoExtras = ObtenerArchivo("extras.md", False)
+        self.infoExtras = ObtenerArchivo(self.archivoExtras, False)
 
         print(f"Data Costos: {self.infoCostos}")
         print(f"Data Extras: {self.infoExtras}")
