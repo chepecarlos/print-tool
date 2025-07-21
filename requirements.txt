@@ -4,3 +4,4 @@ python-telegram-bot
 paho-mqtt
 pywebview
 pywebview[qt]
+importlib-resources
