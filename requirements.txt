@@ -5,3 +5,6 @@ paho-mqtt
 pywebview
 pywebview[qt]
 importlib-resources
+
+# Dependencia de submodulo MiLibrerias
+colorlog
