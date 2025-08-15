@@ -16,6 +16,7 @@ class printtool:
 
     totalGramos: float = 0
     # Total de gramos de la impresión
+
     totalHoras: float = 0
     # Total de horas de la impresión
 
@@ -24,13 +25,13 @@ class printtool:
     # Nombre del modelo
     linkModelo: str = ""
     # Link del modelo
-    cantidadModelo = 1
+    cantidadModelo: int = 1
 
-    precioVenta = 0
+    precioVenta: float = 0
     # Precio de venta ingresado por el usuario
 
-    tipoProductos = ["alconcilla", "figuras", "otro"]
-    
+    tipoProductos: list[str] = ["alcancilla", "maseta", "figuras", "otro"]
+
     folderProyecto: str = None
     # Folder del proyecto
 
@@ -71,6 +72,7 @@ class printtool:
         self.infoBase = ObtenerArchivo("data/costos.md")
         self.infoCostos = ObtenerArchivo(self.archivoInfo, False)
         self.infoExtras = ObtenerArchivo(self.archivoExtras, False)
+        
 
         print(f"Data Costos: {self.infoCostos}")
         print(f"Data Extras: {self.infoExtras}")
@@ -237,6 +239,9 @@ class printtool:
         """Calcular costos"""
 
         data = ObtenerArchivo("data/costos.md")
+        if data is None:
+            print("Error fatal con data costos.md")
+            exit(1)
         # dataExtras = ObtenerArchivo("costos.md", False)
         # dataVentas = ObtenerArchivo("ventas.md", False)
         dataVentas = self.infoCostos
@@ -292,11 +297,13 @@ class printtool:
             + self.costoExtras
         )
 
+        self.costoUnidad = self.costoTotal / self.cantidadModelo
+
         for data in self.tablaCostos.rows:
             if data["nombre"] == "Total filamento (g)":
                 data["valor"] = f"{self.totalGramos:.2f}g"
             elif data["nombre"] == "Tiempo  Ensamblaje (m)":
-                data["valor"] = f"{int(tiempoEnsamblaje)} m"
+                data["valor"] = f"{int(tiempoEnsamblaje):.2f} m"
             elif data["nombre"] == "Costo Material":
                 data["valor"] = f"${self.costoFilamento:.2f}"
             elif data["nombre"] == "Eficiencia filamento":
@@ -311,6 +318,8 @@ class printtool:
                 data["valor"] = self.cantidadModelo
             elif data["nombre"] == "Costo total":
                 data["valor"] = f"${self.costoTotal:.2f}"
+            elif data["nombre"] == "Costo Unidad":
+                data["valor"] = f"${self.costoUnidad:.2f}"
 
     def mostarModelos(self):
 
@@ -341,6 +350,7 @@ class printtool:
             {"nombre": "Costo Extra", "valor": 0},
             {"nombre": "Cantidad", "valor": 1},
             {"nombre": "Costo total", "valor": 0},
+            {"nombre": "Costo Unidad", "valor": 0},
         ]
         self.tablaCostos = ui.table(
             columns=infoBásica, rows=dataCostos, row_key="nombre"
@@ -501,14 +511,13 @@ class printtool:
         self.textoCantidad = ui.input(
             label="Cantidad", value=self.cantidadModelo, validation=self.validar_numero
         ).classes("w-64")
-        self.textoLink = ui.input(
-            label="Link",
-        ).classes("w-64")
+        self.textoLink = ui.input(value=self.linkModelo, label="Link").classes("w-64")
         ui.button("Guardar", on_click=self.guardarModelo).classes("w-64")
 
     def guardarModelo(self):
         self.nombreModelo = self.textoNombre.value
         self.cantidadModelo = int(self.textoCantidad.value)
+        self.linkModelo = self.textoLink.value
         ui.notify(f"Nombre: {self.nombreModelo} - {self.cantidadModelo}")
 
         SalvarValor(self.archivoInfo, "nombre", self.nombreModelo, local=False)
@@ -518,7 +527,7 @@ class printtool:
             self.cantidadModelo,
             local=False,
         )
-        # SalvarValor(self.archivoInfo, "link", self.textoLink, local=False)
+        SalvarValor(self.archivoInfo, "link", self.linkModelo, local=False)
 
         for file in self.tablaInfo.rows:
             if file["nombre"] == "Nombre":
@@ -559,16 +568,28 @@ class printtool:
                 ]
 
                 dataBásica = [
-                    {"nombre": "Nombre", "valor": self.nombreModelo},
-                    {"nombre": "Cantidad", "valor": self.cantidadModelo},
-                    {"nombre": "Material", "valor": "PLA"},
+                    {"nivel": 0, "nombre": "Nombre", "valor": self.nombreModelo},
+                    {"nivel": 1, "nombre": "Cantidad", "valor": self.cantidadModelo},
+                    {"nivel": 2, "nombre": "Material", "valor": "PLA"},
                     {
+                        "nivel": 3,
                         "nombre": "Total Filamento (g)",
                         "valor": f"{self.totalGramos:.2f}",
                     },
-                    {"nombre": "Tiempo impresión", "valor": "10 H 5 M"},
-                    {"nombre": "Precio", "valor": "123.00$"},
+                    {"nivel": 4, "nombre": "Tiempo impresión", "valor": "-"},
+                    {"nivel": 5, "nombre": "Precio", "valor": "-$"},
                 ]
+
+                if self.cantidadModelo > 1:
+                    dataBásica.append(
+                        {
+                            "nivel": 3,
+                            "nombre": "Material por Unidad",
+                            "valor": f"{self.totalGramos/self.cantidadModelo:.2f} g",
+                        }
+                    )
+
+                dataBásica = sorted(dataBásica, key=lambda x: x["nivel"])
 
                 ui.label("Información Modelo")
                 self.tablaInfo = ui.table(
