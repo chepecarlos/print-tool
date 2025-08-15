@@ -15,28 +15,32 @@ from pathlib import Path
 class printtool:
 
     totalGramos: float = 0
-    # Total de gramos de la impresión
+    "Total de gramos de la impresión"
 
     totalHoras: float = 0
-    # Total de horas de la impresión
+    "Total de horas de la impresión"
 
     # Información de la impresión
     nombreModelo: str = ""
-    # Nombre del modelo
+    "Nombre del modelo"
     linkModelo: str = ""
-    # Link del modelo
+    "Link del modelo"
     cantidadModelo: int = 1
+    "Cantidad de modelos en la impresión"
 
     precioVenta: float = 0
-    # Precio de venta ingresado por el usuario
+    "Precio de venta ingresado por el usuario"
 
     tipoProductos: list[str] = ["alcancilla", "maseta", "figuras", "otro"]
 
     folderProyecto: str = None
-    # Folder del proyecto
+    "Folder del proyecto"
 
     archivoInfo: str = None
     archivoExtras: str = None
+    
+    inventario: int = 0
+    "Cantidad de productos en inventario"
 
     def __init__(self):
         self.totalGramos = 0
@@ -72,7 +76,6 @@ class printtool:
         self.infoBase = ObtenerArchivo("data/costos.md")
         self.infoCostos = ObtenerArchivo(self.archivoInfo, False)
         self.infoExtras = ObtenerArchivo(self.archivoExtras, False)
-        
 
         print(f"Data Costos: {self.infoCostos}")
         print(f"Data Extras: {self.infoExtras}")
@@ -85,9 +88,11 @@ class printtool:
         self.cargarInfoBasica()
 
     def cargarInfoBasica(self):
+        """Cargar información básica del modelo desde archivo info.md"""
         self.nombreModelo = self.infoCostos.get("nombre")
         self.linkModelo = self.infoCostos.get("link")
         self.cantidadModelo = int(self.infoCostos.get("cantidad"))
+        self.inventario = int(self.infoCostos.get("inventario", 0))
         self.precioVenta = self.infoCostos.get("precio_venta")
 
     def cargarDataGcode(self, archivo: str, tipoArchivo: str):
@@ -508,17 +513,24 @@ class printtool:
             "w-64"
         )
         self.tipoImpresion = ui.select(self.tipoProductos, label="tipo").classes("w-64")
+        self.textoInventario = ui.input(
+            label="Inventario", value=self.inventario, validation=self.validar_numero
+        ).classes("w-64")
+
         self.textoCantidad = ui.input(
             label="Cantidad", value=self.cantidadModelo, validation=self.validar_numero
         ).classes("w-64")
+
         self.textoLink = ui.input(value=self.linkModelo, label="Link").classes("w-64")
         ui.button("Guardar", on_click=self.guardarModelo).classes("w-64")
 
     def guardarModelo(self):
+        "Guardar información del modelo en el archivo info.md"
         self.nombreModelo = self.textoNombre.value
+        self.inventario = int(self.textoInventario.value)
         self.cantidadModelo = int(self.textoCantidad.value)
         self.linkModelo = self.textoLink.value
-        ui.notify(f"Nombre: {self.nombreModelo} - {self.cantidadModelo}")
+        ui.notify(f"Nombre: {self.nombreModelo} - {self.inventario}")
 
         SalvarValor(self.archivoInfo, "nombre", self.nombreModelo, local=False)
         SalvarValor(
@@ -528,12 +540,15 @@ class printtool:
             local=False,
         )
         SalvarValor(self.archivoInfo, "link", self.linkModelo, local=False)
+        SalvarValor(self.archivoInfo, "inventario", self.inventario, local=False)
 
         for file in self.tablaInfo.rows:
             if file["nombre"] == "Nombre":
                 file["valor"] = f"{self.nombreModelo}"
             elif file["nombre"] == "Cantidad":
                 file["valor"] = f"{self.cantidadModelo}"
+            elif file["nombre"] == "Inventario":
+                file["valor"] = f"{self.inventario}"
 
         self.tablaInfo.update()
 
@@ -569,7 +584,7 @@ class printtool:
 
                 dataBásica = [
                     {"nivel": 0, "nombre": "Nombre", "valor": self.nombreModelo},
-                    {"nivel": 1, "nombre": "Cantidad", "valor": self.cantidadModelo},
+                    {"nivel": 1, "nombre": "Inventario", "valor": self.inventario},
                     {"nivel": 2, "nombre": "Material", "valor": "PLA"},
                     {
                         "nivel": 3,
