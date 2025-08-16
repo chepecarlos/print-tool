@@ -23,6 +23,10 @@ class printtool:
     # Información de la impresión
     nombreModelo: str = ""
     "Nombre del modelo"
+    propiedadModelo: str = ""
+    "Propiedad del modelo"
+    skuModelo: str = ""
+    "SKU del modelo"
     linkModelo: str = ""
     "Link del modelo"
     cantidadModelo: int = 1
@@ -38,9 +42,12 @@ class printtool:
 
     archivoInfo: str = None
     archivoExtras: str = None
-    
+
     inventario: int = 0
     "Cantidad de productos en inventario"
+    
+    tablaInfo = None
+    "Tabla de información básica del modelo"
 
     def __init__(self):
         self.totalGramos = 0
@@ -94,6 +101,8 @@ class printtool:
         self.cantidadModelo = int(self.infoCostos.get("cantidad"))
         self.inventario = int(self.infoCostos.get("inventario", 0))
         self.precioVenta = self.infoCostos.get("precio_venta")
+        self.skuModelo = self.infoCostos.get("sku", "")
+        self.propiedadModelo = self.infoCostos.get("propiedad", "")
 
     def cargarDataGcode(self, archivo: str, tipoArchivo: str):
         with codecs.open(archivo, "r", encoding="utf-8", errors="ignore") as fdata:
@@ -504,33 +513,49 @@ class printtool:
                 valor["final"] = f"${ganancia:.2f}"
             if valor["nombre"] == "Porcentaje de Ganancia":
                 valor["final"] = f"{porcentajeGanancia:.2f} %"
+                
+        for valor in self.tablaInfo.rows:
+            if valor["nombre"] == "Precio":
+                valor["valor"] = f"${self.precioVenta:.2f}"
 
         self.tablaPrecio.update()
+        self.tablaInfo.update()
 
     def dataModelo(self):
+        "Crear interface para actualizar datos del modelo"
         ui.label("Data del modelo")
+        
         self.textoNombre = ui.input(label="Nombre", value=self.nombreModelo).classes(
             "w-64"
         )
+        self.textoPropiedad = ui.input(label="Propiedad", value=self.propiedadModelo).classes("w-64")
+        
         self.tipoImpresion = ui.select(self.tipoProductos, label="tipo").classes("w-64")
         self.textoInventario = ui.input(
             label="Inventario", value=self.inventario, validation=self.validar_numero
         ).classes("w-64")
 
+        self.textoSKU = ui.input(label="SKU", value=self.skuModelo).classes("w-64")
+
         self.textoCantidad = ui.input(
-            label="Cantidad", value=self.cantidadModelo, validation=self.validar_numero
+            label="Cantidad Impresion", value=self.cantidadModelo, validation=self.validar_numero
         ).classes("w-64")
 
         self.textoLink = ui.input(value=self.linkModelo, label="Link").classes("w-64")
+        
         ui.button("Guardar", on_click=self.guardarModelo).classes("w-64")
 
     def guardarModelo(self):
         "Guardar información del modelo en el archivo info.md"
+
+        # Obtener valores de los campos
         self.nombreModelo = self.textoNombre.value
         self.inventario = int(self.textoInventario.value)
         self.cantidadModelo = int(self.textoCantidad.value)
         self.linkModelo = self.textoLink.value
-        ui.notify(f"Nombre: {self.nombreModelo} - {self.inventario}")
+        self.skuModelo = self.textoSKU.value
+        self.propiedadModelo = self.textoPropiedad.value
+        
 
         SalvarValor(self.archivoInfo, "nombre", self.nombreModelo, local=False)
         SalvarValor(
@@ -541,6 +566,8 @@ class printtool:
         )
         SalvarValor(self.archivoInfo, "link", self.linkModelo, local=False)
         SalvarValor(self.archivoInfo, "inventario", self.inventario, local=False)
+        SalvarValor(self.archivoInfo, "propiedad", self.propiedadModelo, local=False)
+        SalvarValor(self.archivoInfo, "sku", self.skuModelo, local=False)
 
         for file in self.tablaInfo.rows:
             if file["nombre"] == "Nombre":
@@ -549,8 +576,15 @@ class printtool:
                 file["valor"] = f"{self.cantidadModelo}"
             elif file["nombre"] == "Inventario":
                 file["valor"] = f"{self.inventario}"
+            elif file["nombre"] == "Propiedad":
+                file["valor"] = f"{self.propiedadModelo}"
+            elif file["nombre"] == "SKU":
+                file["valor"] = f"{self.skuModelo}"
 
         self.tablaInfo.update()
+        
+        ui.notify(f"Salvando Información")
+
 
     def cargarGUI(self):
         print("Cargando GUI")
@@ -584,6 +618,7 @@ class printtool:
 
                 dataBásica = [
                     {"nivel": 0, "nombre": "Nombre", "valor": self.nombreModelo},
+                    {"nivel": 0, "nombre": "Propiedad", "valor": self.propiedadModelo},
                     {"nivel": 1, "nombre": "Inventario", "valor": self.inventario},
                     {"nivel": 2, "nombre": "Material", "valor": "PLA"},
                     {
@@ -626,6 +661,7 @@ class printtool:
 
             with ui.tab_panel(data):
 
-                self.dataModelo()
+                self.dataModelo()  
+                
 
         ui.run(native=True, window_size=(600, 800), reload=False)
