@@ -45,7 +45,7 @@ class printtool:
 
     inventario: int = 0
     "Cantidad de productos en inventario"
-    
+
     tablaInfo = None
     "Tabla de información básica del modelo"
 
@@ -404,7 +404,7 @@ class printtool:
 
         ui.table(columns=infoCostos, rows=dataCostos, row_key="nombre")
 
-    def mostarPrecio(self):
+    def mostrarPrecio(self):
 
         ui.label("Costo Precio")
         print("cargando precios")
@@ -513,7 +513,7 @@ class printtool:
                 valor["final"] = f"${ganancia:.2f}"
             if valor["nombre"] == "Porcentaje de Ganancia":
                 valor["final"] = f"{porcentajeGanancia:.2f} %"
-                
+
         for valor in self.tablaInfo.rows:
             if valor["nombre"] == "Precio":
                 valor["valor"] = f"${self.precioVenta:.2f}"
@@ -521,15 +521,18 @@ class printtool:
         self.tablaPrecio.update()
         self.tablaInfo.update()
 
-    def dataModelo(self):
+    def cargarGuiActualizar(self):
         "Crear interface para actualizar datos del modelo"
-        ui.label("Data del modelo")
-        
+
+        ui.label("Editar información").classes("w-64")
+
         self.textoNombre = ui.input(label="Nombre", value=self.nombreModelo).classes(
             "w-64"
         )
-        self.textoPropiedad = ui.input(label="Propiedad", value=self.propiedadModelo).classes("w-64")
-        
+        self.textoPropiedad = ui.input(
+            label="Propiedad", value=self.propiedadModelo
+        ).classes("w-64")
+
         self.tipoImpresion = ui.select(self.tipoProductos, label="tipo").classes("w-64")
         self.textoInventario = ui.input(
             label="Inventario", value=self.inventario, validation=self.validar_numero
@@ -538,11 +541,13 @@ class printtool:
         self.textoSKU = ui.input(label="SKU", value=self.skuModelo).classes("w-64")
 
         self.textoCantidad = ui.input(
-            label="Cantidad Impresion", value=self.cantidadModelo, validation=self.validar_numero
+            label="Cantidad Impresion",
+            value=self.cantidadModelo,
+            validation=self.validar_numero,
         ).classes("w-64")
 
         self.textoLink = ui.input(value=self.linkModelo, label="Link").classes("w-64")
-        
+
         ui.button("Guardar", on_click=self.guardarModelo).classes("w-64")
 
     def guardarModelo(self):
@@ -555,7 +560,6 @@ class printtool:
         self.linkModelo = self.textoLink.value
         self.skuModelo = self.textoSKU.value
         self.propiedadModelo = self.textoPropiedad.value
-        
 
         SalvarValor(self.archivoInfo, "nombre", self.nombreModelo, local=False)
         SalvarValor(
@@ -582,86 +586,103 @@ class printtool:
                 file["valor"] = f"{self.skuModelo}"
 
         self.tablaInfo.update()
-        
+
         ui.notify(f"Salvando Información")
 
+    def cargarGuiInfo(self):
+        columnaInfo = [
+            {
+                "name": "nombre",
+                "label": "Nombre",
+                "field": "nombre",
+                "required": True,
+                "align": "left",
+            },
+            {
+                "name": "valor",
+                "label": "Referencia",
+                "field": "valor",
+                "required": True,
+                "align": "center",
+            },
+        ]
+
+        dataInfo = [
+            {"nivel": 0, "nombre": "Nombre", "valor": self.nombreModelo},
+            {"nivel": 0, "nombre": "Propiedad", "valor": self.propiedadModelo},
+            {"nivel": 1, "nombre": "Inventario", "valor": self.inventario},
+            {"nivel": 2, "nombre": "Material", "valor": "PLA"},
+            {
+                "nivel": 3,
+                "nombre": "Total Filamento (g)",
+                "valor": f"{self.totalGramos:.2f}",
+            },
+            {"nivel": 4, "nombre": "Tiempo impresión", "valor": "-"},
+            {"nivel": 5, "nombre": "Precio", "valor": "-$"},
+        ]
+
+        if self.cantidadModelo > 1:
+            dataInfo.append(
+                {
+                    "nivel": 3,
+                    "nombre": "Material por Unidad",
+                    "valor": f"{self.totalGramos/self.cantidadModelo:.2f} g",
+                }
+            )
+
+        dataInfo = sorted(dataInfo, key=lambda x: x["nivel"])
+
+        self.tablaInfo = ui.table(columns=columnaInfo, rows=dataInfo, row_key="nombre")
+
+    def cargarGuiCostos(self):
+        with ui.scroll_area().classes(
+            "w-full h-100 border border-2 border-teal-600h"
+        ).style("height: 75vh"):
+
+            ui.label("Costo Modelo")
+
+            self.mostarModelos()
 
     def cargarGUI(self):
-        print("Cargando GUI")
+        """Cargar la interfaz gráfica de usuario (GUI)."""
+        with ui.header(elevated=True) as cabecera:
+            cabecera.classes("bg-teal-700 items-center justify-between")
+            cabecera.style("height: 5vh; padding: 1px")
+            with ui.row().classes("w-full justify-center items-center"):
+                ui.label("PrintTool").classes("text-h5 px-8")
 
-        with ui.tabs().classes("w-full bg-teal-700 text-white").style(
+        with ui.tabs().classes("w-full bg-teal-00 text-white").style(
             "padding: 0px"
         ) as tabs:
-            info = ui.tab("info", icon="home")
-            costo = ui.tab("Costos", icon="view_in_ar")
-            precio = ui.tab("Precio", icon="paid")
-            data = ui.tab("Modelo", icon="assignment")
+            self.tabInfo = ui.tab("info", icon="home")
+            self.tabCosto = ui.tab("Costos", icon="view_in_ar")
+            self.tabPrecio = ui.tab("Precio", icon="paid")
+            self.tabData = ui.tab("Modelo", icon="assignment")
 
-        with ui.tab_panels(tabs, value=info).classes("w-full"):
-            with ui.tab_panel(info):
-                infoBásica = [
-                    {
-                        "name": "nombre",
-                        "label": "Nombre",
-                        "field": "nombre",
-                        "required": True,
-                        "align": "left",
-                    },
-                    {
-                        "name": "valor",
-                        "label": "Referencia",
-                        "field": "valor",
-                        "required": True,
-                        "align": "center",
-                    },
-                ]
+        with ui.tab_panels(tabs, value=self.tabInfo).classes("w-full"):
+            with ui.tab_panel(self.tabInfo):
+                with ui.row().classes("w-full justify-center items-center"):
+                    self.cargarGuiInfo()
+            with ui.tab_panel(self.tabCosto).style("padding: 0px"):
+                with ui.row().classes("w-full justify-center items-center"):
+                    self.cargarGuiCostos()
+            with ui.tab_panel(self.tabPrecio):
+                with ui.row().classes("w-full justify-center items-center"):
+                    self.mostrarPrecio()
+            with ui.tab_panel(self.tabData):
+                with ui.row().classes("w-full justify-center items-center"):
+                    self.cargarGuiActualizar()
 
-                dataBásica = [
-                    {"nivel": 0, "nombre": "Nombre", "valor": self.nombreModelo},
-                    {"nivel": 0, "nombre": "Propiedad", "valor": self.propiedadModelo},
-                    {"nivel": 1, "nombre": "Inventario", "valor": self.inventario},
-                    {"nivel": 2, "nombre": "Material", "valor": "PLA"},
-                    {
-                        "nivel": 3,
-                        "nombre": "Total Filamento (g)",
-                        "valor": f"{self.totalGramos:.2f}",
-                    },
-                    {"nivel": 4, "nombre": "Tiempo impresión", "valor": "-"},
-                    {"nivel": 5, "nombre": "Precio", "valor": "-$"},
-                ]
+        with ui.footer() as pie:
+            pie.classes("bg-teal-700")
+            pie.style("height: 5vh; padding: 1px")
+            with ui.row().classes("w-full justify-center items-center"):
+                ui.label("Creado por ChepeCarlos").classes("text-white")
 
-                if self.cantidadModelo > 1:
-                    dataBásica.append(
-                        {
-                            "nivel": 3,
-                            "nombre": "Material por Unidad",
-                            "valor": f"{self.totalGramos/self.cantidadModelo:.2f} g",
-                        }
-                    )
-
-                dataBásica = sorted(dataBásica, key=lambda x: x["nivel"])
-
-                ui.label("Información Modelo")
-                self.tablaInfo = ui.table(
-                    columns=infoBásica, rows=dataBásica, row_key="nombre"
-                )
-
-            with ui.tab_panel(costo).style("padding: 0px"):
-                with ui.scroll_area().classes(
-                    "w-full h-100 border border-2 border-teal-600h"
-                ).style("height: 75vh"):
-
-                    ui.label("Costo Modelo")
-
-                    self.mostarModelos()
-
-            with ui.tab_panel(precio):
-
-                self.mostarPrecio()
-
-            with ui.tab_panel(data):
-
-                self.dataModelo()  
-                
-
-        ui.run(native=True, window_size=(600, 800), reload=False)
+        ui.run(
+            native=True,
+            window_size=(600, 800),
+            reload=False,
+            dark=True,
+            language="es",
+        )
