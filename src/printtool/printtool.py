@@ -60,6 +60,7 @@ class printtool:
         self.totalGramos = 0
         self.totalHoras = 0
         self.precioVenta = 0
+        self.costoTotal = 0
 
     def configurarData(self):
         """Configurar la carpeta del proyecto y los archivos de información."""
@@ -77,7 +78,7 @@ class printtool:
 
         configurarArchivo(self.archivoInfo, dataBaseInfo)
 
-    def calcularPrecios(self):
+    def iniciarSistema(self):
 
         self.configurarData()
 
@@ -112,6 +113,9 @@ class printtool:
         self.skuModelo = self.infoCostos.get("sku", "")
         self.propiedadModelo = self.infoCostos.get("propiedad", "")
         self.tipoModelo = self.infoCostos.get("tipo", "desconocido")
+        
+        self.totalGramos = float(self.infoCostos.get("total_gramos", 0))
+        self.totalHoras = float(self.infoCostos.get("total_horas", 0))
 
     def cargarDataGcode(self, archivo: str, tipoArchivo: str) -> dict[str, float]:
         """Cargar datos de un archivo G-code.
@@ -234,6 +238,9 @@ class printtool:
                 "tiempo": f"{int(self.totalHoras)}h {minutos}m",
             }
         )
+        
+        SalvarValor(self.archivoInfo, "total_gramos", self.totalGramos, local=False)
+        SalvarValor(self.archivoInfo, "total_horas", self.totalHoras, local=False)
 
         self.tablaDataGcode.rows = dataArchivo
         self.tablaDataGcode.update()
@@ -246,11 +253,6 @@ class printtool:
 
         self.tablaInfo.update()
 
-    def dataArchivos(self):
-
-        self.cargarDataArchivos()
-
-        self.calcularCostos()
 
     def calcularCostos(self):
         """Calcular costos"""
@@ -338,6 +340,8 @@ class printtool:
             elif data["nombre"] == "Costo Unidad":
                 data["valor"] = f"${self.costoUnidad:.2f}"
 
+        self.tablaCostos.update()
+
     def costosExtras(self):
         dataCostos = []
 
@@ -352,28 +356,57 @@ class printtool:
         self.tablaDataExtras.rows = dataCostos
         self.tablaDataExtras.update()
 
-    def mostrarPrecio(self):
+    def calculandoPrecioVenta(self):
 
-        print("cargando precios")
-
-        data = ObtenerArchivo("data/costos.md")
-        ganancia = float(data.get("ganancia"))
+        ganancia = float(self.infoBase.get("ganancia"))
 
         self.costoPorModelo = self.costoTotal / self.cantidadModelo
-
         precioAntesIva = self.costoPorModelo / (1 - ganancia / 100)
         cantidadGanancia = precioAntesIva - self.costoPorModelo
         iva = precioAntesIva * 0.13
         precioSugerido = precioAntesIva + iva
 
-        print(f"Precio venta: {self.precioVenta}")
         if self.precioVenta is None:
             self.precioVenta = precioSugerido
 
+       
+        
+        if self.precioVenta >= 0:
+            ventaPrecioSinIva = self.precioVenta / 1.13
+            ventaIva = self.precioVenta - ventaPrecioSinIva
+            ventaGanancia = ventaPrecioSinIva - self.costoPorModelo
+            if ventaGanancia < 0 or ventaPrecioSinIva == 0:
+                VentaPorcentajeGanancia = 0
+            else:
+                VentaPorcentajeGanancia = (1 - (self.costoPorModelo / ventaPrecioSinIva)) * 100
+
+        dataPrecio = [
+            {
+                "nombre": "Costo fabricación",
+                "valor": f"${self.costoPorModelo:.2f}",
+                "final": f"${self.costoPorModelo:.2f}",
+            },
+            {"nombre": "Porcentaje de Ganancia", "valor": f"{ganancia} %", "final": f"{VentaPorcentajeGanancia:.2f} %"},
+            {"nombre": "Ganancia", "valor": f"${cantidadGanancia:.2f}", "final": f"${ventaGanancia:.2f}"},
+            {"nombre": "Precio antes de iva", "valor": f"${precioAntesIva:.2f}", "final": f"${ventaPrecioSinIva:.2f}"},
+            {"nombre": "Iva", "valor": f"${iva:.2f}" , "final": f"${ventaIva:.2f}"},
+            {
+                "nombre": "Costo de venta",
+                "valor": f"${precioSugerido:.2f}",
+                "final": f"${self.precioVenta:.2f}",
+            },
+        ]
+
+        self.tablaPrecio.rows = dataPrecio
+        self.tablaPrecio.update()
+        
         for valor in self.tablaInfo.rows:
             if valor["nombre"] == "Precio":
                 valor["valor"] = f"${self.precioVenta:.2f}"
         self.tablaInfo.update()
+
+
+    def cargarGuiPrecio(self):
 
         columns = [
             {
@@ -399,19 +432,15 @@ class printtool:
             },
         ]
 
-        rows = [
-            {
-                "nombre": "Costo fabricación",
-                "valor": f"${self.costoPorModelo:.2f}",
-                "final": f"${self.costoPorModelo:.2f}",
-            },
-            {"nombre": "Porcentaje de Ganancia", "valor": f"{ganancia} %"},
-            {"nombre": "Ganancia", "valor": f"${cantidadGanancia:.2f}"},
-            {"nombre": "Precio antes de iva", "valor": f"${precioAntesIva:.2f}"},
-            {"nombre": "Iva", "valor": f"${iva:.2f}"},
+        dataPrecio = [
+            {"nombre": "Costo fabricación"},
+            {"nombre": "Porcentaje de Ganancia"},
+            {"nombre": "Ganancia"},
+            {"nombre": "Precio antes de iva"},
+            {"nombre": "Iva"},
             {
                 "nombre": "Costo de venta",
-                "valor": f"${precioSugerido:.2f}",
+                "valor": f"${0:.2f}",
                 "final": f"${self.precioVenta:.2f}",
             },
         ]
@@ -425,11 +454,10 @@ class printtool:
             ui.button(on_click=self.actualizarPrecios, icon="send")
             self.textoVenta.on("keydown.enter", self.actualizarPrecios)
 
-        self.tablaPrecio = ui.table(columns=columns, rows=rows, row_key="nombre")
+        self.tablaPrecio = ui.table(columns=columns, rows=dataPrecio, row_key="nombre")
 
         ui.button("Actualizar Costos", on_click=self.actualizarPrecios)
 
-        self.actualizarPrecios()
 
     def validar_numero(self, value):
         try:
@@ -443,33 +471,8 @@ class printtool:
         self.precioVenta = float(self.textoVenta.value)
         SalvarValor(self.archivoInfo, "precio_venta", self.precioVenta, local=False)
         print(f"Actualizar precios {self.precioVenta}")
-
-        preciosinIva = self.precioVenta / 1.13
-        iva = self.precioVenta - preciosinIva
-        ganancia = preciosinIva - self.costoPorModelo
-        if ganancia < 0 or preciosinIva == 0:
-            porcentajeGanancia = 0
-        else:
-            porcentajeGanancia = (1 - (self.costoPorModelo / preciosinIva)) * 100
-
-        for valor in self.tablaPrecio.rows:
-            if valor["nombre"] == "Costo de venta":
-                valor["final"] = f"${self.precioVenta:.2f}"
-            if valor["nombre"] == "Precio antes de iva":
-                valor["final"] = f"${preciosinIva:.2f}"
-            if valor["nombre"] == "Iva":
-                valor["final"] = f"${iva:.2f}"
-            if valor["nombre"] == "Ganancia":
-                valor["final"] = f"${ganancia:.2f}"
-            if valor["nombre"] == "Porcentaje de Ganancia":
-                valor["final"] = f"{porcentajeGanancia:.2f} %"
-
-        for valor in self.tablaInfo.rows:
-            if valor["nombre"] == "Precio":
-                valor["valor"] = f"${self.precioVenta:.2f}"
-
-        self.tablaPrecio.update()
-        self.tablaInfo.update()
+        
+        self.cargarCostos()
 
         ui.notify(f"Actualizando precios a ${self.precioVenta:.2f}")
 
@@ -478,9 +481,10 @@ class printtool:
 
         ui.label("Editar información").classes("w-64")
 
-        self.textoNombre = ui.input(label="Nombre", value=self.nombreModelo).classes(
-            "w-64"
-        )
+        self.textoNombre = ui.input(label="Nombre", value=self.nombreModelo)
+        self.textoNombre.classes("w-64")
+        self.textoNombre.on("keydown.enter", self.guardarModelo)
+
         self.textoPropiedad = ui.input(
             label="Propiedad", value=self.propiedadModelo
         ).classes("w-64")
@@ -566,6 +570,7 @@ class printtool:
                 "align": "center",
             },
         ]
+        
 
         dataInfo = [
             {"nivel": 0, "nombre": "Nombre", "valor": self.nombreModelo},
@@ -579,7 +584,7 @@ class printtool:
                 "valor": f"{self.totalGramos:.2f}",
             },
             {"nivel": 6, "nombre": "Tiempo impresión", "valor": "-"},
-            {"nivel": 7, "nombre": "Precio", "valor": "-$"},
+            {"nivel": 7, "nombre": "Precio", "valor": f"${self.precioVenta:.2f}" if self.precioVenta is not None else "$0.00"},
         ]
 
         if self.cantidadModelo > 1:
@@ -600,6 +605,8 @@ class printtool:
             "w-full h-100 border border-2 border-teal-600h"
         ).style("height: 75vh"):
             with ui.row().classes("w-full justify-center items-center"):
+
+                ui.button("Recargar Costos", on_click=self.cargarCostos).classes("w-64")
 
                 infoCostos = [
                     {
@@ -689,11 +696,12 @@ class printtool:
                     columns=infoCostos, rows=[], row_key="nombre"
                 )
 
-                self.dataArchivos()
-
-                self.costosExtras()
-
-                # self.mostarModelos()
+    def cargarCostos(self):
+        ui.notify("Cargando Costos...")
+        self.cargarDataArchivos()
+        self.calcularCostos()
+        self.costosExtras()
+        self.calculandoPrecioVenta()
 
     def cargarGUI(self):
         """Cargar la interfaz gráfica de usuario (GUI)."""
@@ -720,7 +728,7 @@ class printtool:
                     self.cargarGuiCostos()
             with ui.tab_panel(self.tabPrecio):
                 with ui.row().classes("w-full justify-center items-center"):
-                    self.mostrarPrecio()
+                    self.cargarGuiPrecio()
             with ui.tab_panel(self.tabData):
                 with ui.row().classes("w-full justify-center items-center"):
                     self.cargarGuiActualizar()

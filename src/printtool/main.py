@@ -17,7 +17,7 @@ def main() -> None:
     args = Parámetros()
     logger.info("Empezando Print-Tool")
     objetoPrintTool = printtool()
-    objetoPrintTool.calcularPrecios()
+    objetoPrintTool.iniciarSistema()
     objetoPrintTool.cargarGUI()
 
 if __name__ == "__main__":
