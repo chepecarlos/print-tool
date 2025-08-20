@@ -13,6 +13,7 @@ from pathlib import Path
 
 
 class printtool:
+    """Clase principal para la herramienta de emprendimiento de impresión 3D."""
 
     totalGramos: float = 0
     "Total de gramos de la impresión"
@@ -25,6 +26,9 @@ class printtool:
     "Nombre del modelo"
     propiedadModelo: str = ""
     "Propiedad del modelo"
+    tipoModelo: str = "desconocido"
+    "Tipo de modelo (alcancía, maceta, figuras, otro)"
+
     skuModelo: str = ""
     "SKU del modelo"
     linkModelo: str = ""
@@ -35,7 +39,7 @@ class printtool:
     precioVenta: float = 0
     "Precio de venta ingresado por el usuario"
 
-    tipoProductos: list[str] = ["alcancilla", "maseta", "figuras", "otro"]
+    tipoProductos: list[str] = ["desconocido", "alcancía", "maceta", "figuras", "otro"]
 
     folderProyecto: str = None
     "Folder del proyecto"
@@ -47,7 +51,10 @@ class printtool:
     "Cantidad de productos en inventario"
 
     tablaInfo = None
-    "Tabla de información básica del modelo"
+    "Tabla de información básica del modelo, para pestaña Info"
+
+    tablaDataGcode = None
+    "Tabla de datos de los archivos G-code (material, tiempo, tipo, color), para pestaña Modelo"
 
     def __init__(self):
         self.totalGramos = 0
@@ -55,6 +62,7 @@ class printtool:
         self.precioVenta = 0
 
     def configurarData(self):
+        """Configurar la carpeta del proyecto y los archivos de información."""
 
         if self.folderProyecto is None:
             self.folderProyecto = Path.cwd()
@@ -103,10 +111,21 @@ class printtool:
         self.precioVenta = self.infoCostos.get("precio_venta")
         self.skuModelo = self.infoCostos.get("sku", "")
         self.propiedadModelo = self.infoCostos.get("propiedad", "")
+        self.tipoModelo = self.infoCostos.get("tipo", "desconocido")
 
-    def cargarDataGcode(self, archivo: str, tipoArchivo: str):
+    def cargarDataGcode(self, archivo: str, tipoArchivo: str) -> dict[str, float]:
+        """Cargar datos de un archivo G-code.
+
+        Args:
+            archivo (str): Ruta al archivo G-code.
+            tipoArchivo (str): Tipo de archivo (ejemplo: .bgcode).
+
+        Returns:
+            dict (str, float): Diccionario con la información extraída del archivo (material, tiempo, tipo, color).
+        """
+
         with codecs.open(archivo, "r", encoding="utf-8", errors="ignore") as fdata:
-            info = {
+            info: dict[str, float] = {
                 "material": -1.0,
                 "tiempo": -1.0,
                 "tipo": -1.0,
@@ -171,46 +190,24 @@ class printtool:
 
             return info
 
-    def dataArchivos(self):
-        ui.label("Info Modelo")
-
-        sufijoArchivo = (".bgcode", ".gcode")
-
-        infoArchivo = [
-            {
-                "name": "nombre",
-                "label": "Nombre",
-                "field": "nombre",
-                "required": True,
-                "align": "left",
-            },
-            # {'name': 'archivo', 'label': 'Archivo', 'field': 'archivo'},
-            {
-                "name": "material",
-                "label": "Material",
-                "field": "material",
-                "sortable": True,
-            },
-            {"name": "tiempo", "label": "Tiempo", "field": "tiempo", "sortable": True},
-            {"name": "tipo", "label": "Material", "field": "tipo"},
-            {"name": "color", "label": "Color", "field": "color"},
-        ]
-
-        dataArchivo = []
-
-        folderActual = os.getcwd()
+    def cargarDataArchivos(self):
+        """Cargar datos de los archivos G-code en la carpeta del proyecto."""
 
         self.totalGramos = 0
         self.totalHoras = 0
-        print(f"Buscando en {folderActual}")
-        for archivo in os.listdir(folderActual):
+
+        dataArchivo: list[dict] = []
+
+        print(f"Buscando en {self.folderProyecto}")
+        sufijoArchivo = (".bgcode", ".gcode")
+        for archivo in os.listdir(self.folderProyecto):
             if archivo.endswith(sufijoArchivo):
                 print(f"Archivo encontrado: {archivo}")
                 for subfijo in sufijoArchivo:
                     if subfijo in archivo:
                         tipoArchivo = subfijo
                         nombreArchivo = archivo.removesuffix(subfijo)
-                rutaCompleta = os.path.join(folderActual, archivo)
+                rutaCompleta = os.path.join(self.folderProyecto, archivo)
                 dataGcode = self.cargarDataGcode(rutaCompleta, tipoArchivo)
 
                 horas = int(dataGcode["tiempo"])
@@ -238,7 +235,8 @@ class printtool:
             }
         )
 
-        ui.table(columns=infoArchivo, rows=dataArchivo, row_key="nombre")
+        self.tablaDataGcode.rows = dataArchivo
+        self.tablaDataGcode.update()
 
         for file in self.tablaInfo.rows:
             if file["nombre"] == "Total Filamento (g)":
@@ -247,6 +245,11 @@ class printtool:
                 file["valor"] = f"{int(self.totalHoras)}h {minutos}m"
 
         self.tablaInfo.update()
+
+    def dataArchivos(self):
+
+        self.cargarDataArchivos()
+
         self.calcularCostos()
 
     def calcularCostos(self):
@@ -335,78 +338,22 @@ class printtool:
             elif data["nombre"] == "Costo Unidad":
                 data["valor"] = f"${self.costoUnidad:.2f}"
 
-    def mostarModelos(self):
-
-        infoBásica = [
-            {
-                "name": "nombre",
-                "label": "Nombre",
-                "field": "nombre",
-                "required": True,
-                "align": "left",
-            },
-            {
-                "name": "valor",
-                "label": "Referencia",
-                "field": "valor",
-                "required": True,
-                "align": "center",
-            },
-        ]
-
-        dataCostos = [
-            {"nombre": "Total filamento (g)", "valor": 0},
-            {"nombre": "Tiempo  Ensamblaje (m)", "valor": 0},
-            {"nombre": "Costo Material", "valor": 0},
-            {"nombre": "Eficiencia filamento", "valor": 0},
-            {"nombre": "Costo de impresión hora", "valor": 0},
-            {"nombre": "Costo ensamblado", "valor": 0},
-            {"nombre": "Costo Extra", "valor": 0},
-            {"nombre": "Cantidad", "valor": 1},
-            {"nombre": "Costo total", "valor": 0},
-            {"nombre": "Costo Unidad", "valor": 0},
-        ]
-        self.tablaCostos = ui.table(
-            columns=infoBásica, rows=dataCostos, row_key="nombre"
-        )
-
-        self.dataArchivos()
-
-        self.costosExtras()
-
     def costosExtras(self):
-        ui.label("Costos Extras")
-
-        infoCostos = [
-            {
-                "name": "nombre",
-                "label": "Nombre",
-                "field": "nombre",
-                "required": True,
-                "align": "left",
-            },
-            {
-                "name": "valor",
-                "label": "Referencia",
-                "field": "valor",
-                "required": True,
-                "align": "center",
-            },
-        ]
-
-        dataExtras = ObtenerArchivo("costos.md", False)
-
         dataCostos = []
 
-        if dataExtras is not None:
-            for extra in dataExtras:
-                dataCostos.append({"nombre": extra, "valor": f"${dataExtras[extra]}"})
+        if self.infoExtras is not None:
+            for extra in self.infoExtras:
+                print(extra)
+                dataCostos.append(
+                    {"nombre": extra, "valor": f"${self.infoExtras[extra]}"}
+                )
 
-        ui.table(columns=infoCostos, rows=dataCostos, row_key="nombre")
+        self.tablaDataExtras.clear()
+        self.tablaDataExtras.rows = dataCostos
+        self.tablaDataExtras.update()
 
     def mostrarPrecio(self):
 
-        ui.label("Costo Precio")
         print("cargando precios")
 
         data = ObtenerArchivo("data/costos.md")
@@ -475,9 +422,12 @@ class printtool:
                 value=self.precioVenta,
                 validation=self.validar_numero,
             ).props("rounded outlined dense")
-            ui.button("Actualizar", on_click=self.actualizarPrecios)
+            ui.button(on_click=self.actualizarPrecios, icon="send")
+            self.textoVenta.on("keydown.enter", self.actualizarPrecios)
 
         self.tablaPrecio = ui.table(columns=columns, rows=rows, row_key="nombre")
+
+        ui.button("Actualizar Costos", on_click=self.actualizarPrecios)
 
         self.actualizarPrecios()
 
@@ -521,6 +471,8 @@ class printtool:
         self.tablaPrecio.update()
         self.tablaInfo.update()
 
+        ui.notify(f"Actualizando precios a ${self.precioVenta:.2f}")
+
     def cargarGuiActualizar(self):
         "Crear interface para actualizar datos del modelo"
 
@@ -533,7 +485,9 @@ class printtool:
             label="Propiedad", value=self.propiedadModelo
         ).classes("w-64")
 
-        self.tipoImpresion = ui.select(self.tipoProductos, label="tipo").classes("w-64")
+        self.tipoImpresion = ui.select(
+            self.tipoProductos, label="tipo", value=self.tipoModelo
+        ).classes("w-64")
         self.textoInventario = ui.input(
             label="Inventario", value=self.inventario, validation=self.validar_numero
         ).classes("w-64")
@@ -560,6 +514,7 @@ class printtool:
         self.linkModelo = self.textoLink.value
         self.skuModelo = self.textoSKU.value
         self.propiedadModelo = self.textoPropiedad.value
+        self.tipoModelo = self.tipoImpresion.value
 
         SalvarValor(self.archivoInfo, "nombre", self.nombreModelo, local=False)
         SalvarValor(
@@ -569,6 +524,7 @@ class printtool:
             local=False,
         )
         SalvarValor(self.archivoInfo, "link", self.linkModelo, local=False)
+        SalvarValor(self.archivoInfo, "tipo", self.tipoModelo, local=False)
         SalvarValor(self.archivoInfo, "inventario", self.inventario, local=False)
         SalvarValor(self.archivoInfo, "propiedad", self.propiedadModelo, local=False)
         SalvarValor(self.archivoInfo, "sku", self.skuModelo, local=False)
@@ -584,6 +540,10 @@ class printtool:
                 file["valor"] = f"{self.propiedadModelo}"
             elif file["nombre"] == "SKU":
                 file["valor"] = f"{self.skuModelo}"
+            elif file["nombre"] == "Link":
+                file["valor"] = f"{self.linkModelo}"
+            elif file["nombre"] == "Tipo":
+                file["valor"] = f"{self.tipoModelo}"
 
         self.tablaInfo.update()
 
@@ -609,16 +569,17 @@ class printtool:
 
         dataInfo = [
             {"nivel": 0, "nombre": "Nombre", "valor": self.nombreModelo},
-            {"nivel": 0, "nombre": "Propiedad", "valor": self.propiedadModelo},
-            {"nivel": 1, "nombre": "Inventario", "valor": self.inventario},
-            {"nivel": 2, "nombre": "Material", "valor": "PLA"},
+            {"nivel": 1, "nombre": "Propiedad", "valor": self.propiedadModelo},
+            {"nivel": 2, "nombre": "Tipo", "valor": self.tipoModelo},
+            {"nivel": 3, "nombre": "Inventario", "valor": self.inventario},
+            {"nivel": 4, "nombre": "Material", "valor": "PLA"},
             {
-                "nivel": 3,
+                "nivel": 5,
                 "nombre": "Total Filamento (g)",
                 "valor": f"{self.totalGramos:.2f}",
             },
-            {"nivel": 4, "nombre": "Tiempo impresión", "valor": "-"},
-            {"nivel": 5, "nombre": "Precio", "valor": "-$"},
+            {"nivel": 6, "nombre": "Tiempo impresión", "valor": "-"},
+            {"nivel": 7, "nombre": "Precio", "valor": "-$"},
         ]
 
         if self.cantidadModelo > 1:
@@ -638,10 +599,101 @@ class printtool:
         with ui.scroll_area().classes(
             "w-full h-100 border border-2 border-teal-600h"
         ).style("height: 75vh"):
+            with ui.row().classes("w-full justify-center items-center"):
 
-            ui.label("Costo Modelo")
+                infoCostos = [
+                    {
+                        "name": "nombre",
+                        "label": "Nombre",
+                        "field": "nombre",
+                        "required": True,
+                        "align": "left",
+                    },
+                    {
+                        "name": "valor",
+                        "label": "Referencia",
+                        "field": "valor",
+                        "required": True,
+                        "align": "center",
+                    },
+                ]
 
-            self.mostarModelos()
+                dataCostos = [
+                    {"nombre": "Total filamento (g)", "valor": 0},
+                    {"nombre": "Tiempo  Ensamblaje (m)", "valor": 0},
+                    {"nombre": "Costo Material", "valor": 0},
+                    {"nombre": "Eficiencia filamento", "valor": 0},
+                    {"nombre": "Costo de impresión hora", "valor": 0},
+                    {"nombre": "Costo ensamblado", "valor": 0},
+                    {"nombre": "Costo Extra", "valor": 0},
+                    {"nombre": "Cantidad", "valor": 1},
+                    {"nombre": "Costo total", "valor": 0},
+                    {"nombre": "Costo Unidad", "valor": 0},
+                ]
+                self.tablaCostos = ui.table(
+                    columns=infoCostos, rows=dataCostos, row_key="nombre"
+                )
+                self.tablaCostos.classes("w-100")
+
+                infoArchivo = [
+                    {
+                        "name": "nombre",
+                        "label": "Modelos",
+                        "field": "nombre",
+                        "required": True,
+                        "align": "left",
+                    },
+                    # {'name': 'archivo', 'label': 'Archivo', 'field': 'archivo'},
+                    {
+                        "name": "material",
+                        "label": "Material",
+                        "field": "material",
+                        "sortable": True,
+                    },
+                    {
+                        "name": "tiempo",
+                        "label": "Tiempo",
+                        "field": "tiempo",
+                        "sortable": True,
+                    },
+                    {"name": "tipo", "label": "Material", "field": "tipo"},
+                    {"name": "color", "label": "Color", "field": "color"},
+                ]
+
+                with ui.scroll_area().classes(
+                    "w-full h-100 border border-2 border-teal-600h"
+                ):
+                    with ui.row().classes("w-full justify-center items-center"):
+                        self.tablaDataGcode = ui.table(
+                            columns=infoArchivo, rows=[], row_key="nombre"
+                        )
+
+                infoCostos = [
+                    {
+                        "name": "nombre",
+                        "label": "Extras",
+                        "field": "nombre",
+                        "required": True,
+                        "align": "left",
+                    },
+                    {
+                        "name": "valor",
+                        "label": "Referencia",
+                        "field": "valor",
+                        "required": True,
+                        "align": "center",
+                    },
+                ]
+
+                self.tablaDataExtras = ui.table(
+                    columns=infoCostos, rows=[], row_key="nombre"
+                )
+
+                self.dataArchivos()
+
+                self.costosExtras()
+
+                # self.mostarModelos()
 
     def cargarGUI(self):
         """Cargar la interfaz gráfica de usuario (GUI)."""
