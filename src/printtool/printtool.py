@@ -28,6 +28,8 @@ class printtool:
     "Propiedad del modelo"
     tipoModelo: str = "desconocido"
     "Tipo de modelo (alcancía, maceta, figuras, otro)"
+    descripciónModelo: str = ""
+    "Descripción del modelo"
 
     skuModelo: str = ""
     "SKU del modelo"
@@ -112,8 +114,9 @@ class printtool:
         self.precioVenta = self.infoCostos.get("precio_venta")
         self.skuModelo = self.infoCostos.get("sku", "")
         self.propiedadModelo = self.infoCostos.get("propiedad", "")
+        self.descripciónModelo = self.infoCostos.get("descripción", "")
         self.tipoModelo = self.infoCostos.get("tipo", "desconocido")
-        
+
         self.totalGramos = float(self.infoCostos.get("total_gramos", 0))
         self.totalHoras = float(self.infoCostos.get("total_horas", 0))
 
@@ -238,7 +241,7 @@ class printtool:
                 "tiempo": f"{int(self.totalHoras)}h {minutos}m",
             }
         )
-        
+
         SalvarValor(self.archivoInfo, "total_gramos", self.totalGramos, local=False)
         SalvarValor(self.archivoInfo, "total_horas", self.totalHoras, local=False)
 
@@ -252,7 +255,6 @@ class printtool:
                 file["valor"] = f"{int(self.totalHoras)}h {minutos}m"
 
         self.tablaInfo.update()
-
 
     def calcularCostos(self):
         """Calcular costos"""
@@ -369,8 +371,6 @@ class printtool:
         if self.precioVenta is None:
             self.precioVenta = precioSugerido
 
-       
-        
         if self.precioVenta >= 0:
             ventaPrecioSinIva = self.precioVenta / 1.13
             ventaIva = self.precioVenta - ventaPrecioSinIva
@@ -378,7 +378,9 @@ class printtool:
             if ventaGanancia < 0 or ventaPrecioSinIva == 0:
                 VentaPorcentajeGanancia = 0
             else:
-                VentaPorcentajeGanancia = (1 - (self.costoPorModelo / ventaPrecioSinIva)) * 100
+                VentaPorcentajeGanancia = (
+                    1 - (self.costoPorModelo / ventaPrecioSinIva)
+                ) * 100
 
         dataPrecio = [
             {
@@ -386,10 +388,22 @@ class printtool:
                 "valor": f"${self.costoPorModelo:.2f}",
                 "final": f"${self.costoPorModelo:.2f}",
             },
-            {"nombre": "Porcentaje de Ganancia", "valor": f"{ganancia} %", "final": f"{VentaPorcentajeGanancia:.2f} %"},
-            {"nombre": "Ganancia", "valor": f"${cantidadGanancia:.2f}", "final": f"${ventaGanancia:.2f}"},
-            {"nombre": "Precio antes de iva", "valor": f"${precioAntesIva:.2f}", "final": f"${ventaPrecioSinIva:.2f}"},
-            {"nombre": "Iva", "valor": f"${iva:.2f}" , "final": f"${ventaIva:.2f}"},
+            {
+                "nombre": "Porcentaje de Ganancia",
+                "valor": f"{ganancia} %",
+                "final": f"{VentaPorcentajeGanancia:.2f} %",
+            },
+            {
+                "nombre": "Ganancia",
+                "valor": f"${cantidadGanancia:.2f}",
+                "final": f"${ventaGanancia:.2f}",
+            },
+            {
+                "nombre": "Precio antes de iva",
+                "valor": f"${precioAntesIva:.2f}",
+                "final": f"${ventaPrecioSinIva:.2f}",
+            },
+            {"nombre": "Iva", "valor": f"${iva:.2f}", "final": f"${ventaIva:.2f}"},
             {
                 "nombre": "Costo de venta",
                 "valor": f"${precioSugerido:.2f}",
@@ -399,12 +413,11 @@ class printtool:
 
         self.tablaPrecio.rows = dataPrecio
         self.tablaPrecio.update()
-        
+
         for valor in self.tablaInfo.rows:
             if valor["nombre"] == "Precio":
                 valor["valor"] = f"${self.precioVenta:.2f}"
         self.tablaInfo.update()
-
 
     def cargarGuiPrecio(self):
 
@@ -458,7 +471,6 @@ class printtool:
 
         ui.button("Actualizar Costos", on_click=self.actualizarPrecios)
 
-
     def validar_numero(self, value):
         try:
             float(value)  # Intentar convertir el valor a float
@@ -471,7 +483,7 @@ class printtool:
         self.precioVenta = float(self.textoVenta.value)
         SalvarValor(self.archivoInfo, "precio_venta", self.precioVenta, local=False)
         print(f"Actualizar precios {self.precioVenta}")
-        
+
         self.cargarCostos()
 
         ui.notify(f"Actualizando precios a ${self.precioVenta:.2f}")
@@ -504,6 +516,8 @@ class printtool:
             validation=self.validar_numero,
         ).classes("w-64")
 
+        self.textoDescripción = ui.textarea(label="Descripción", value=self.descripciónModelo).props("clearable").classes("w-64")
+
         self.textoLink = ui.input(value=self.linkModelo, label="Link").classes("w-64")
 
         ui.button("Guardar", on_click=self.guardarModelo).classes("w-64")
@@ -519,6 +533,7 @@ class printtool:
         self.skuModelo = self.textoSKU.value
         self.propiedadModelo = self.textoPropiedad.value
         self.tipoModelo = self.tipoImpresion.value
+        self.descripciónModelo = self.textoDescripción.value
 
         SalvarValor(self.archivoInfo, "nombre", self.nombreModelo, local=False)
         SalvarValor(
@@ -531,6 +546,7 @@ class printtool:
         SalvarValor(self.archivoInfo, "tipo", self.tipoModelo, local=False)
         SalvarValor(self.archivoInfo, "inventario", self.inventario, local=False)
         SalvarValor(self.archivoInfo, "propiedad", self.propiedadModelo, local=False)
+        SalvarValor(self.archivoInfo, "descripción", self.descripciónModelo, local=False)
         SalvarValor(self.archivoInfo, "sku", self.skuModelo, local=False)
 
         for file in self.tablaInfo.rows:
@@ -570,7 +586,8 @@ class printtool:
                 "align": "center",
             },
         ]
-        
+
+        # minutos = int((self.totalHoras - int(self.totalHoras)) * 60)
 
         dataInfo = [
             {"nivel": 0, "nombre": "Nombre", "valor": self.nombreModelo},
@@ -583,8 +600,20 @@ class printtool:
                 "nombre": "Total Filamento (g)",
                 "valor": f"{self.totalGramos:.2f}",
             },
-            {"nivel": 6, "nombre": "Tiempo impresión", "valor": "-"},
-            {"nivel": 7, "nombre": "Precio", "valor": f"${self.precioVenta:.2f}" if self.precioVenta is not None else "$0.00"},
+            {
+                "nivel": 6,
+                "nombre": "Tiempo impresión",
+                "valor": f"{int(self.totalHoras)}h {int((self.totalHoras - int(self.totalHoras)) * 60)}m",
+            },
+            {
+                "nivel": 7,
+                "nombre": "Precio",
+                "valor": (
+                    f"${self.precioVenta:.2f}"
+                    if self.precioVenta is not None
+                    else "$0.00"
+                ),
+            },
         ]
 
         if self.cantidadModelo > 1:
