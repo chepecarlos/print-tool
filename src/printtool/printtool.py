@@ -116,6 +116,8 @@ class printtool:
         self.propiedadModelo = self.infoCostos.get("propiedad", "")
         self.descripciónModelo = self.infoCostos.get("descripción", "")
         self.tipoModelo = self.infoCostos.get("tipo", "desconocido")
+        if self.tipoModelo not in self.tipoProductos:
+            self.tipoModelo = "desconocido"
 
         self.totalGramos = float(self.infoCostos.get("total_gramos", 0))
         self.totalHoras = float(self.infoCostos.get("total_horas", 0))
@@ -500,7 +502,6 @@ class printtool:
         self.textoPropiedad = ui.input(
             label="Propiedad", value=self.propiedadModelo
         ).classes("w-64")
-
         self.tipoImpresion = ui.select(
             self.tipoProductos, label="tipo", value=self.tipoModelo
         ).classes("w-64")
@@ -587,7 +588,6 @@ class printtool:
             },
         ]
 
-        # minutos = int((self.totalHoras - int(self.totalHoras)) * 60)
 
         dataInfo = [
             {"nivel": 0, "nombre": "Nombre", "valor": self.nombreModelo},
