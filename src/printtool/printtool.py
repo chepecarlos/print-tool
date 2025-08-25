@@ -2,14 +2,18 @@ from nicegui import ui
 import codecs
 import re
 import os
+from pathlib import Path
 from printtool.MiLibrerias import (
     ObtenerArchivo,
     SalvarValor,
     SalvarArchivo,
     configurarArchivo,
     obtenerArchivoPaquete,
+    ConfigurarLogging
 )
-from pathlib import Path
+
+logger = ConfigurarLogging(__name__)
+
 
 
 class printtool:
@@ -63,6 +67,11 @@ class printtool:
         self.totalHoras = 0
         self.precioVenta = 0
         self.costoTotal = 0
+        
+    @staticmethod
+    def esProyecto(folder: str) -> bool:
+        "confirma si el proyecto es válido"
+        return os.path.exists(os.path.join(folder, "info.md")) and os.path.exists(os.path.join(folder, "extras.md"))
 
     def configurarData(self):
         """Configurar la carpeta del proyecto y los archivos de información."""
@@ -74,9 +83,8 @@ class printtool:
 
         dataBaseInfo = obtenerArchivoPaquete("printtool", "config/info.md")
         if dataBaseInfo is None:
-            print("Error fatal con paquete falta info.md")
+            logger.error("Error fatal con paquete falta info.md")
             exit(1)
-        print(f"Data Defecto: {dataBaseInfo}")
 
         configurarArchivo(self.archivoInfo, dataBaseInfo)
 
@@ -84,25 +92,22 @@ class printtool:
 
         self.configurarData()
 
-        print(f"Buscando en: {self.archivoInfo}")
+        logger.debug(f"Buscando en: {self.archivoInfo}")
 
         if not os.path.exists(self.archivoExtras):
             data = dict()
             SalvarArchivo(self.archivoExtras, data)
-            print(f"Creando data base de {self.archivoExtras}")
+            logger.info(f"Creando data base de {self.archivoExtras}")
 
         self.infoBase = ObtenerArchivo("data/costos.md")
         self.infoCostos = ObtenerArchivo(self.archivoInfo, False)
         self.infoExtras = ObtenerArchivo(self.archivoExtras, False)
 
-        print(f"Data Costos: {self.infoCostos}")
-        print(f"Data Extras: {self.infoExtras}")
-
         self.costoExtras = 0
         if self.infoCostos is not None:
             for extra in self.infoExtras:
                 costoExtras += float(self.infoExtras[extra])
-        print(f"Costo extras: {self.costoExtras}")
+        logger.info(f"Costo extras: {self.costoExtras}")
         self.cargarInfoBasica()
 
     def cargarInfoBasica(self):
@@ -147,8 +152,6 @@ class printtool:
                 lineasDocumento = "\n".join(lineas[:30])
             else:
                 lineasDocumento = data
-            # print(f"Primera lineas: {lineasDocumento}")
-            # print("-"*80)
 
             buscarImpresora = re.search(r"printer_model=.*(MMU3)", lineasDocumento)
 
@@ -157,7 +160,7 @@ class printtool:
             else:
                 self.multiMaterial = False
 
-            print(f"MultiMaterial de impresora: {self.multiMaterial}")
+            logger.info(f"MultiMaterial de impresora: {self.multiMaterial}")
 
             if self.multiMaterial:
                 # Formato de la línea: printer_model=MMU3
@@ -182,7 +185,7 @@ class printtool:
                 if buscarGramos:
                     info["material"] = float(buscarGramos.group(1))
 
-            print(f"Buscar Gramos : { info['material']}")
+            logger.info(f"Buscar Gramos : { info['material']}")
 
             time_match = re.search(
                 r"estimated printing time \(normal mode\)\s?=\s?(([0-9]+)h )?([0-9]+)m ([0-9]+)s",
@@ -207,11 +210,11 @@ class printtool:
 
         dataArchivo: list[dict] = []
 
-        print(f"Buscando en {self.folderProyecto}")
+        logger.info(f"Buscando en {self.folderProyecto}")
         sufijoArchivo = (".bgcode", ".gcode")
         for archivo in os.listdir(self.folderProyecto):
             if archivo.endswith(sufijoArchivo):
-                print(f"Archivo encontrado: {archivo}")
+                logger.info(f"Archivo encontrado: {archivo}")
                 for subfijo in sufijoArchivo:
                     if subfijo in archivo:
                         tipoArchivo = subfijo
@@ -239,7 +242,7 @@ class printtool:
             {
                 "nombre": "Total",
                 "archivo": "",
-                "material": f"{self.totalGramos}g",
+                "material": f"{self.totalGramos:.2f}g",
                 "tiempo": f"{int(self.totalHoras)}h {minutos}m",
             }
         )
@@ -263,12 +266,10 @@ class printtool:
 
         data = ObtenerArchivo("data/costos.md")
         if data is None:
-            print("Error fatal con data costos.md")
+            logger.error("Error fatal con data costos.md")
             exit(1)
-        # dataExtras = ObtenerArchivo("costos.md", False)
-        # dataVentas = ObtenerArchivo("ventas.md", False)
         dataVentas = self.infoCostos
-        print(f"Data ventas: {dataVentas}")
+        logger.info(f"Data ventas: {dataVentas}")
 
         if dataVentas is None:
             tiempoEnsamblaje = 0
@@ -307,9 +308,9 @@ class printtool:
             1 + self.errorFabricacion
         )
 
-        print(f"costo extras: {self.costoExtras}")
-        print(f"costo hora impresión: {costoHoraImpresion:.2f}")
-        print(f"Precio por gramo: {self.costoGramo}")
+        logger.info(f"costo extras: {self.costoExtras}")
+        logger.info(f"costo hora impresión: {costoHoraImpresion:.2f}")
+        logger.info(f"Precio por gramo: {self.costoGramo}")
 
         costoHoraImpresion = costoHoraImpresion * self.totalHoras
         self.costoTotal = (
@@ -351,7 +352,6 @@ class printtool:
 
         if self.infoExtras is not None:
             for extra in self.infoExtras:
-                print(extra)
                 dataCostos.append(
                     {"nombre": extra, "valor": f"${self.infoExtras[extra]}"}
                 )
@@ -484,7 +484,7 @@ class printtool:
     def actualizarPrecios(self):
         self.precioVenta = float(self.textoVenta.value)
         SalvarValor(self.archivoInfo, "precio_venta", self.precioVenta, local=False)
-        print(f"Actualizar precios {self.precioVenta}")
+        logger.info(f"Actualizar precios {self.precioVenta}")
 
         self.cargarCostos()
 
@@ -494,6 +494,8 @@ class printtool:
         "Crear interface para actualizar datos del modelo"
 
         ui.label("Editar información").classes("w-64")
+
+        ui.label(f"Proyecto: {self.folderProyecto}").classes("w-64").classes("text-white w-64 text-center break-words")
 
         self.textoNombre = ui.input(label="Nombre", value=self.nombreModelo)
         self.textoNombre.classes("w-64")
@@ -732,13 +734,12 @@ class printtool:
         self.costosExtras()
         self.calculandoPrecioVenta()
 
-    def cargarGUI(self):
-        """Cargar la interfaz gráfica de usuario (GUI)."""
-        with ui.header(elevated=True) as cabecera:
-            cabecera.classes("bg-teal-700 items-center justify-between")
-            cabecera.style("height: 5vh; padding: 1px")
-            with ui.row().classes("w-full justify-center items-center"):
-                ui.label("PrintTool").classes("text-h5 px-8")
+    def cargarGUI(self, interfaceCargada: bool = False):
+        """Cargar la interfaz gráfica de usuario (GUI)
+
+        Args:
+            interfaceCargada (bool): Indica si la interfaz ya ha sido cargada.
+        """
 
         with ui.tabs().classes("w-full bg-teal-00 text-white").style(
             "padding: 0px"
@@ -762,16 +763,24 @@ class printtool:
                 with ui.row().classes("w-full justify-center items-center"):
                     self.cargarGuiActualizar()
 
-        with ui.footer() as pie:
-            pie.classes("bg-teal-700")
-            pie.style("height: 5vh; padding: 1px")
-            with ui.row().classes("w-full justify-center items-center"):
-                ui.label("Creado por ChepeCarlos").classes("text-white")
-
-        ui.run(
-            native=True,
-            window_size=(600, 800),
-            reload=False,
-            dark=True,
-            language="es",
-        )
+        if not interfaceCargada:
+            
+            with ui.header(elevated=True) as cabecera:
+                cabecera.classes("bg-teal-700 items-center justify-between")
+                cabecera.style("height: 5vh; padding: 1px")
+                with ui.row().classes("w-full justify-center items-center"):
+                    ui.label("PrintTool").classes("text-h5 px-8")
+            
+            with ui.footer() as pie:
+                pie.classes("bg-teal-700")
+                pie.style("height: 5vh; padding: 1px")
+                with ui.row().classes("w-full justify-center items-center"):
+                    ui.label("Creado por ChepeCarlos").classes("text-white")
+            
+            ui.run(
+                native=True,
+                window_size=(600, 800),
+                reload=False,
+                dark=True,
+                language="es",
+            )
