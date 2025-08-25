@@ -1,5 +1,10 @@
 {
     "cSpell.words": [
         "printtool"
-    ]
+    ],
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/.git": true,
+        "**/docs": true
+    }
 }
