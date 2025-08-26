@@ -4,6 +4,11 @@ DOCS_DIR = docs
 # Paquete o ruta del código a documentar
 PACKAGE = src/printtool
 
+
+install:
+	@echo "Instalando Paquete..."
+	pipx install . --force
+
 # Generar documentación
 docs:
 	@echo "Generando documentación con pdoc..."
