@@ -1,7 +1,7 @@
 
 import argparse
 import os
-from printtool.MiLibrerias import  ConfigurarLogging
+from printtool.MiLibrerias import  ConfigurarLogging, obtenerArchivoPaquete
 from printtool.printtool import printtool
 from printtool.inventario import inventario
 logger = ConfigurarLogging(__name__)
@@ -34,7 +34,9 @@ def buscarProyectos(Proyecto: list[str], ruta: str) -> list[str]:
 
 
 def main() -> None:
+    """Función principal del programa."""
     
+    print(obtenerArchivoPaquete("printtool", "config/info.md"))
     args = Parámetros()
     
     if args.inventario:

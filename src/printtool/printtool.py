@@ -35,6 +35,9 @@ class printtool:
     descripciónModelo: str = ""
     "Descripción del modelo"
 
+    tiempoEnsamblado: float = 0
+    "Tiempo de ensamblado del modelo (Minutos)"
+
     skuModelo: str = ""
     "SKU del modelo"
     linkModelo: str = ""
@@ -121,6 +124,7 @@ class printtool:
         self.propiedadModelo = self.infoCostos.get("propiedad", "")
         self.descripciónModelo = self.infoCostos.get("descripción", "")
         self.tipoModelo = self.infoCostos.get("tipo", "desconocido")
+        self.tiempoEnsamblado = float(self.infoCostos.get("tiempo_ensamblaje", 0))
         if self.tipoModelo not in self.tipoProductos:
             self.tipoModelo = "desconocido"
 
@@ -264,39 +268,35 @@ class printtool:
     def calcularCostos(self):
         """Calcular costos"""
 
-        data = ObtenerArchivo("data/costos.md")
-        if data is None:
+        # data = ObtenerArchivo("data/costos.md")
+        if self.infoBase is None:
             logger.error("Error fatal con data costos.md")
             exit(1)
         dataVentas = self.infoCostos
         logger.info(f"Data ventas: {dataVentas}")
 
-        if dataVentas is None:
-            tiempoEnsamblaje = 0
-        else:
-            tiempoEnsamblaje = float(dataVentas.get("tiempo_ensamblaje"))
-        horaTrabajo = float(data.get("hora_trabajo"))
-        costoEmsanblado = (tiempoEnsamblaje / 60) * horaTrabajo
+        costoHoraTrabajo = float(self.infoBase.get("hora_trabajo", 0))
+        costoEnsamblado = (self.tiempoEnsamblado / 60) * costoHoraTrabajo
 
-        self.costoGramo = float(data.get("precio_filamento")) / 1000
+        self.costoGramo = float(self.infoBase.get("precio_filamento", 0)) / 1000
 
         self.costoFilamento = self.totalGramos * self.costoGramo
         self.costoEficiencia = (
-            self.costoFilamento * float(data.get("eficiencia_material")) / 100
+            self.costoFilamento * float(self.infoBase.get("eficiencia_material")) / 100
         )
 
-        self.costoImpresora = int(data.get("costo_impresora"))
-        self.envioImpresora = int(data.get("envio_impresora"))
-        self.mantenimientoImpresora = int(data.get("mantenimiento_impresora"))
-        self.vidaUtil = int(data.get("vida_util"))
-        self.tiempoTrabajo = (int(data.get("tiempo_trabajo")) / 100) * 8760
-        self.consumoPotencia = int(data.get("consumo"))
-        self.costoElectricidad = float(data.get("costo_electricidad"))
-        self.errorFabricacion = float(data.get("error_fabricacion")) / 100
+        self.costoImpresora: float = float(self.infoBase.get("costo_impresora"))
+        self.envióImpresora: float = float(self.infoBase.get("envio_impresora"))
+        self.mantenimientoImpresora: float = float(self.infoBase.get("mantenimiento_impresora"))
+        self.vidaUtil: float = float(self.infoBase.get("vida_util"))
+        self.tiempoTrabajo: float = (float(self.infoBase.get("tiempo_trabajo")) / 100) * 8760
+        self.consumoPotencia: float = float(self.infoBase.get("consumo"))
+        self.costoElectricidad: float = float(self.infoBase.get("costo_electricidad"))
+        self.errorFabricacion: float = float(self.infoBase.get("error_fabricacion")) / 100
 
         costoTotalImpresora = (
             self.costoImpresora
-            + self.envioImpresora
+            + self.envióImpresora
             + self.mantenimientoImpresora * self.vidaUtil
         )
 
@@ -317,7 +317,7 @@ class printtool:
             self.costoFilamento
             + self.costoEficiencia
             + costoHoraImpresion
-            + costoEmsanblado
+            + costoEnsamblado
             + self.costoExtras
         )
 
@@ -326,8 +326,8 @@ class printtool:
         for data in self.tablaCostos.rows:
             if data["nombre"] == "Total filamento (g)":
                 data["valor"] = f"{self.totalGramos:.2f}g"
-            elif data["nombre"] == "Tiempo  Ensamblaje (m)":
-                data["valor"] = f"{int(tiempoEnsamblaje):.2f} m"
+            elif data["nombre"] == "Tiempo Ensamblaje (m)":
+                data["valor"] = f"{self.tiempoEnsamblado:.2f} m"
             elif data["nombre"] == "Costo Material":
                 data["valor"] = f"${self.costoFilamento:.2f}"
             elif data["nombre"] == "Eficiencia filamento":
@@ -335,7 +335,7 @@ class printtool:
             elif data["nombre"] == "Costo de impresión hora":
                 data["valor"] = f"${costoHoraImpresion:.2f}"
             elif data["nombre"] == "Costo ensamblado":
-                data["valor"] = f"${costoEmsanblado:.2f}"
+                data["valor"] = f"${costoEnsamblado:.2f}"
             elif data["nombre"] == "Costo Extra":
                 data["valor"] = f"${self.costoExtras:.2f}"
             elif data["nombre"] == "Cantidad":
@@ -362,7 +362,7 @@ class printtool:
 
     def calculandoPrecioVenta(self):
 
-        ganancia = float(self.infoBase.get("ganancia"))
+        ganancia = float(self.infoBase.get("ganancia", 10))
 
         self.costoPorModelo = self.costoTotal / self.cantidadModelo
         precioAntesIva = self.costoPorModelo / (1 - ganancia / 100)
@@ -392,7 +392,7 @@ class printtool:
             },
             {
                 "nombre": "Porcentaje de Ganancia",
-                "valor": f"{ganancia} %",
+                "valor": f"{ganancia:.2f} %",
                 "final": f"{VentaPorcentajeGanancia:.2f} %",
             },
             {
@@ -471,7 +471,6 @@ class printtool:
 
         self.tablaPrecio = ui.table(columns=columns, rows=dataPrecio, row_key="nombre")
 
-        ui.button("Actualizar Costos", on_click=self.actualizarPrecios)
 
     def validar_numero(self, value):
         try:
@@ -631,6 +630,12 @@ class printtool:
 
         self.tablaInfo = ui.table(columns=columnaInfo, rows=dataInfo, row_key="nombre")
 
+    def actualizarEnsamblado(self):
+        self.tiempoEnsamblado = float(self.textoTiempoEnsamblado.value)
+        SalvarValor(self.archivoInfo, "tiempo_ensamblaje", self.tiempoEnsamblado, local=False)
+        self.cargarCostos()
+        ui.notify(f"Tiempo de ensamblado actualizado a {self.tiempoEnsamblado} minutos")
+
     def cargarGuiCostos(self):
         with ui.scroll_area().classes(
             "w-full h-100 border border-2 border-teal-600h"
@@ -638,6 +643,15 @@ class printtool:
             with ui.row().classes("w-full justify-center items-center"):
 
                 ui.button("Recargar Costos", on_click=self.cargarCostos).classes("w-64")
+                
+                with ui.row().props("rounded outlined dense"):
+                    self.textoTiempoEnsamblado = ui.input(
+                        label="Tiempo Ensamblado (Minutos)",
+                        value=self.tiempoEnsamblado,
+                        validation=self.validar_numero,
+                    ).props("rounded outlined dense")
+                    ui.button(on_click=self.actualizarEnsamblado, icon="send")
+                    self.textoTiempoEnsamblado.on("keydown.enter", self.actualizarEnsamblado)
 
                 infoCostos = [
                     {
@@ -658,7 +672,7 @@ class printtool:
 
                 dataCostos = [
                     {"nombre": "Total filamento (g)", "valor": 0},
-                    {"nombre": "Tiempo  Ensamblaje (m)", "valor": 0},
+                    {"nombre": "Tiempo Ensamblaje (m)", "valor": 0},
                     {"nombre": "Costo Material", "valor": 0},
                     {"nombre": "Eficiencia filamento", "valor": 0},
                     {"nombre": "Costo de impresión hora", "valor": 0},
@@ -708,24 +722,38 @@ class printtool:
 
                 infoCostos = [
                     {
-                        "name": "nombre",
+                        "name": "extra",
                         "label": "Extras",
-                        "field": "nombre",
+                        "field": "extra",
                         "required": True,
                         "align": "left",
                     },
                     {
-                        "name": "valor",
-                        "label": "Referencia",
-                        "field": "valor",
+                        "name": "precio",
+                        "label": "Precio",
+                        "field": "precio",
                         "required": True,
-                        "align": "center",
+                        "align": "left",
                     },
                 ]
 
                 self.tablaDataExtras = ui.table(
-                    columns=infoCostos, rows=[], row_key="nombre"
+                    columns=infoCostos, rows=[], row_key="extra"
                 )
+                
+                with self.tablaDataExtras as tabla:
+                    with tabla.add_slot('bottom-row'):
+                        with tabla.row():
+                            with tabla.cell():
+                                new_name = ui.input('Extra')
+                            with tabla.cell():
+                                new_age = ui.number('Precio')
+                            with tabla.cell():
+                                ui.button(on_click=lambda: (
+                                    tabla.add_row({'id': "pollo", 'extra': new_name.value, 'precio': new_age.value}),
+                                    new_name.set_value(None),
+                                    new_age.set_value(None),
+                                ), icon='add').props('flat fab-mini')
 
     def cargarCostos(self):
         ui.notify("Cargando Costos...")
