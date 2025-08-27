@@ -7,6 +7,7 @@ from printtool.MiLibrerias import (
     ObtenerArchivo,
     SalvarValor,
     SalvarArchivo,
+    agregarValor,
     configurarArchivo,
     obtenerArchivoPaquete,
     ConfigurarLogging
@@ -66,11 +67,12 @@ class printtool:
     "Tabla de datos de los archivos G-code (material, tiempo, tipo, color), para pestaña Modelo"
 
     def __init__(self):
-        self.totalGramos = 0
-        self.totalHoras = 0
-        self.precioVenta = 0
-        self.costoTotal = 0
-        
+        self.totalGramos: float = 0
+        self.totalHoras: float = 0
+        self.precioVenta: float = 0
+        self.costoTotal: float = 0
+        self.costoExtras: float = 0
+
     @staticmethod
     def esProyecto(folder: str) -> bool:
         "confirma si el proyecto es válido"
@@ -80,6 +82,7 @@ class printtool:
         """Configurar la carpeta del proyecto y los archivos de información."""
 
         if self.folderProyecto is None:
+            logger.error("Usando folder actual para proyecto")
             self.folderProyecto = Path.cwd()
         self.archivoInfo = os.path.join(self.folderProyecto, "info.md")
         self.archivoExtras = os.path.join(self.folderProyecto, "extras.md")
@@ -106,11 +109,6 @@ class printtool:
         self.infoCostos = ObtenerArchivo(self.archivoInfo, False)
         self.infoExtras = ObtenerArchivo(self.archivoExtras, False)
 
-        self.costoExtras = 0
-        if self.infoCostos is not None:
-            for extra in self.infoExtras:
-                costoExtras += float(self.infoExtras[extra])
-        logger.info(f"Costo extras: {self.costoExtras}")
         self.cargarInfoBasica()
 
     def cargarInfoBasica(self):
@@ -349,16 +347,42 @@ class printtool:
 
     def costosExtras(self):
         dataCostos = []
+        self.costoExtras = 0
+        self.tablaDataExtras.clear()
+        
+        self.infoExtras = ObtenerArchivo(self.archivoExtras, False)
+
 
         if self.infoExtras is not None:
             for extra in self.infoExtras:
                 dataCostos.append(
-                    {"nombre": extra, "valor": f"${self.infoExtras[extra]}"}
+                    {"extra": extra, "precio": f"${self.infoExtras[extra]:.2f}"}
                 )
+                self.costoExtras += float(self.infoExtras[extra])
+        dataCostos.append(
+                {"extra": "Total", "precio": f"${self.costoExtras:.2f}"}
+            )
 
-        self.tablaDataExtras.clear()
+        with self.tablaDataExtras as tabla:
+            with tabla.add_slot('bottom-row'):
+                with tabla.row():
+                    with tabla.cell():
+                        self.textoExtra = ui.input('Extra')
+                    with tabla.cell():
+                        self.textoCostoExtra = ui.number('Precio')
+                    with tabla.cell():
+                        ui.button(on_click=self.agregarCostoExtra, icon='add').props('flat fab-mini')
+
         self.tablaDataExtras.rows = dataCostos
         self.tablaDataExtras.update()
+
+    def agregarCostoExtra(self):
+        extra = self.textoExtra.value
+        precio = self.textoCostoExtra.value
+        
+        if extra and precio is not None:
+            agregarValor(self.archivoExtras, extra, precio, False)
+            self.cargarCostos()
 
     def calculandoPrecioVenta(self):
 
@@ -741,25 +765,13 @@ class printtool:
                     columns=infoCostos, rows=[], row_key="extra"
                 )
                 
-                with self.tablaDataExtras as tabla:
-                    with tabla.add_slot('bottom-row'):
-                        with tabla.row():
-                            with tabla.cell():
-                                new_name = ui.input('Extra')
-                            with tabla.cell():
-                                new_age = ui.number('Precio')
-                            with tabla.cell():
-                                ui.button(on_click=lambda: (
-                                    tabla.add_row({'id': "pollo", 'extra': new_name.value, 'precio': new_age.value}),
-                                    new_name.set_value(None),
-                                    new_age.set_value(None),
-                                ), icon='add').props('flat fab-mini')
+                
 
     def cargarCostos(self):
         ui.notify("Cargando Costos...")
         self.cargarDataArchivos()
-        self.calcularCostos()
         self.costosExtras()
+        self.calcularCostos()
         self.calculandoPrecioVenta()
 
     def cargarGUI(self, interfaceCargada: bool = False):
