@@ -57,6 +57,15 @@ class printtool:
     archivoInfo: str = None
     archivoExtras: str = None
 
+    infoBase: dict[str, float] = None
+    """Información base para cálculos de costos
+    
+    Ejemplo:
+        Costo Maquina
+        Vida Util
+        Ganancia
+    """
+
     inventario: int = 0
     "Cantidad de productos en inventario"
 
@@ -123,11 +132,27 @@ class printtool:
         self.descripciónModelo = self.infoCostos.get("descripción", "")
         self.tipoModelo = self.infoCostos.get("tipo", "desconocido")
         self.tiempoEnsamblado = float(self.infoCostos.get("tiempo_ensamblaje", 0))
+
         if self.tipoModelo not in self.tipoProductos:
             self.tipoModelo = "desconocido"
 
         self.totalGramos = float(self.infoCostos.get("total_gramos", 0))
         self.totalHoras = float(self.infoCostos.get("total_horas", 0))
+        
+        self.filamentosDisponibles:list[dict] = self.infoBase.get("filamentos")
+
+        self.filamentoSeleccionado = int(self.infoCostos.get("filamento_seleccionado", 1))
+        self.listaFilamentos = dict()
+        for filamento in self.filamentosDisponibles:
+            id = filamento.get("id", "")
+            nombre = filamento.get("nombre", "")
+            precio = filamento.get("precio", "")
+            material = filamento.get("material", "")
+            if id is not None:
+                self.listaFilamentos[id] = f"{nombre}-{material} ${precio:.02f}"
+
+        if self.filamentoSeleccionado not in self.listaFilamentos:
+            self.filamentoSeleccionado = 1
 
     def cargarDataGcode(self, archivo: str, tipoArchivo: str) -> dict[str, float]:
         """Cargar datos de un archivo G-code.
@@ -266,7 +291,6 @@ class printtool:
     def calcularCostos(self):
         """Calcular costos"""
 
-        # data = ObtenerArchivo("data/costos.md")
         if self.infoBase is None:
             logger.error("Error fatal con data costos.md")
             exit(1)
@@ -275,8 +299,15 @@ class printtool:
 
         costoHoraTrabajo = float(self.infoBase.get("hora_trabajo", 0))
         costoEnsamblado = (self.tiempoEnsamblado / 60) * costoHoraTrabajo
-
-        self.costoGramo = float(self.infoBase.get("precio_filamento", 0)) / 1000
+        
+        if self.filamentoSeleccionado is not None:
+            for filamento in self.filamentosDisponibles:
+                id_filamento = filamento.get("id", "")
+                if id_filamento == self.filamentoSeleccionado:
+                    precioFilamento = filamento.get("precio", 0)
+                    self.costoGramo = precioFilamento / 1000
+        else:
+            self.costoGramo = float(self.infoBase.get("precio_filamento", 0)) / 1000
 
         self.costoFilamento = self.totalGramos * self.costoGramo
         self.costoEficiencia = (
@@ -344,8 +375,21 @@ class printtool:
                 data["valor"] = f"${self.costoUnidad:.2f}"
 
         self.tablaCostos.update()
+        
+    def borrarExtra(self):
+        """Borrar costo extra seleccionado"""
+        filaSeleccionada = self.tablaDataExtras.selected
+        if self.infoExtras is not None:
+            id = filaSeleccionada[0].get("extra")
+            del self.infoExtras[id]
+            
+        SalvarArchivo(self.archivoExtras, self.infoExtras)
+        
+        self.costosExtras()
+
 
     def costosExtras(self):
+        """Cargar y mostrar los costos extras desde el archivo extras.md"""
         dataCostos = []
         self.costoExtras = 0
         self.tablaDataExtras.clear()
@@ -367,11 +411,19 @@ class printtool:
             with tabla.add_slot('bottom-row'):
                 with tabla.row():
                     with tabla.cell():
+                        ui.button(on_click=self.agregarCostoExtra, icon='add').props('flat fab-mini')
+                    with tabla.cell():
                         self.textoExtra = ui.input('Extra')
                     with tabla.cell():
                         self.textoCostoExtra = ui.number('Precio')
-                    with tabla.cell():
-                        ui.button(on_click=self.agregarCostoExtra, icon='add').props('flat fab-mini')
+                with tabla.add_slot("top-right"):
+                    with ui.input(placeholder="Search").props("type=search").bind_value(
+                        tabla, "filter"
+                    ).add_slot("append"):
+                        ui.icon("search")
+            with tabla.add_slot("top-left"):
+                    ui.button(icon='delete', color="red", on_click=self.borrarExtra) \
+                    .bind_visibility_from(self.tablaDataExtras, 'selected', backward=lambda val: bool(val))
 
         self.tablaDataExtras.rows = dataCostos
         self.tablaDataExtras.update()
@@ -660,22 +712,32 @@ class printtool:
         self.cargarCostos()
         ui.notify(f"Tiempo de ensamblado actualizado a {self.tiempoEnsamblado} minutos")
 
+    def seleccionarFilamento(self):
+        """Seleccionar filamento"""
+        self.filamentoSeleccionado = self.selectorFilamento.value
+        ui.notify(f"Filamento seleccionado: {self.listaFilamentos[self.filamentoSeleccionado]}")
+        SalvarValor(self.archivoInfo, "filamento_seleccionado", self.filamentoSeleccionado, local=False)
+
     def cargarGuiCostos(self):
         with ui.scroll_area().classes(
             "w-full h-100 border border-2 border-teal-600h"
         ).style("height: 75vh"):
             with ui.row().classes("w-full justify-center items-center"):
+                with ui.column().classes("justify-center items-center"):
+                    ui.button("Recargar Costos", on_click=self.cargarCostos).classes("w-64")
 
-                ui.button("Recargar Costos", on_click=self.cargarCostos).classes("w-64")
-                
-                with ui.row().props("rounded outlined dense"):
-                    self.textoTiempoEnsamblado = ui.input(
-                        label="Tiempo Ensamblado (Minutos)",
-                        value=self.tiempoEnsamblado,
-                        validation=self.validar_numero,
-                    ).props("rounded outlined dense")
-                    ui.button(on_click=self.actualizarEnsamblado, icon="send")
-                    self.textoTiempoEnsamblado.on("keydown.enter", self.actualizarEnsamblado)
+                    with ui.row().props("rounded outlined dense"):
+                        self.textoTiempoEnsamblado = ui.input(
+                            label="Tiempo Ensamblado (Minutos)",
+                            value=self.tiempoEnsamblado,
+                            validation=self.validar_numero,
+                        ).props("rounded outlined dense")
+                        ui.button(on_click=self.actualizarEnsamblado, icon="send")
+                        self.textoTiempoEnsamblado.on("keydown.enter", self.actualizarEnsamblado)
+
+                    
+                    if self.filamentosDisponibles is not None:
+                        self.selectorFilamento =ui.select(self.listaFilamentos, value=self.filamentoSeleccionado, label="Material", on_change=self.seleccionarFilamento).classes("min-w-64")
 
                 infoCostos = [
                     {
@@ -707,7 +769,7 @@ class printtool:
                     {"nombre": "Costo Unidad", "valor": 0},
                 ]
                 self.tablaCostos = ui.table(
-                    columns=infoCostos, rows=dataCostos, row_key="nombre"
+                    columns=infoCostos, rows=dataCostos, row_key="nombre", 
                 )
                 self.tablaCostos.classes("w-100")
 
@@ -741,7 +803,7 @@ class printtool:
                 ):
                     with ui.row().classes("w-full justify-center items-center"):
                         self.tablaDataGcode = ui.table(
-                            columns=infoArchivo, rows=[], row_key="nombre"
+                            columns=infoArchivo, rows=[], row_key="nombre", pagination=5,
                         )
 
                 infoCostos = [
@@ -762,10 +824,9 @@ class printtool:
                 ]
 
                 self.tablaDataExtras = ui.table(
-                    columns=infoCostos, rows=[], row_key="extra"
+                    columns=infoCostos, rows=[], row_key="extra", selection="single",  pagination=5,
                 )
-                
-                
+
 
     def cargarCostos(self):
         ui.notify("Cargando Costos...")
