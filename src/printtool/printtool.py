@@ -193,7 +193,7 @@ class printtool:
                 # Formato de la línea: printer_model=MMU3
                 # filament used [g]=81.79, 17.95, 41.29, 0.00, 0.00
                 buscarGramos = re.search(
-                    r"filament used \[g\]=([0-9.]+), ([0-9.]+), ([0-9.]+), ([0-9.]+), ([0-9.]+)",
+                    r"filament used \[g\]\s*=\s*([0-9.]+), ([0-9.]+), ([0-9.]+), ([0-9.]+), ([0-9.]+)",
                     lineasDocumento,
                 )
                 if buscarGramos:
