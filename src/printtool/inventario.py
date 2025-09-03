@@ -102,12 +102,12 @@ class inventario:
             rows=dataInfo,
             selection="single",
             row_key="ruta",
-            pagination=5,
+            pagination=8,
         )
 
         with self.tablaInfo as tabla:
-            tabla.classes("w-full")
-            tabla.style("height: 70vh; overflow-y: auto")
+            tabla.classes("w-full h-full")
+            # tabla.style("height: 70vh; overflow-y: auto")
 
             with tabla.add_slot("top-right"):
                 with ui.input(placeholder="Search").props("type=search").bind_value(
@@ -120,18 +120,6 @@ class inventario:
                 ).bind_visibility_from(
                     tabla, "selected", backward=lambda val: bool(val)
                 )
-            with tabla.add_slot("bottom-row"):
-                with tabla.row():
-                    with tabla.cell():
-                        ui.button("pollo", icon="add").props("flat fab-mini")
-                    with tabla.cell():
-                        new_name = ui.input("Name")
-                    with tabla.cell():
-                        new_age = ui.number("Age")
-
-        ui.label().bind_text_from(
-            tabla, "selected", lambda val: f"Current selection: {val}"
-        )
         self.tablaInfo.update()
 
         with ui.footer() as pie:
