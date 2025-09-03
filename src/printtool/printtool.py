@@ -887,4 +887,5 @@ class printtool:
                 reload=False,
                 dark=True,
                 language="es",
+                title="PrintTool"
             )

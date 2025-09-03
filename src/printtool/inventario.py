@@ -134,4 +134,5 @@ class inventario:
             reload=False,
             dark=True,
             language="es",
+            title="Inventario de PrintTool",
         )
