@@ -98,7 +98,7 @@ class printtool:
 
         dataBaseInfo = obtenerArchivoPaquete("printtool", "config/info.md")
         if dataBaseInfo is None:
-            logger.error("Error fatal con paquete falta info.md")
+            logger.error("Error fatal con paquete falta config/info.md")
             exit(1)
 
         configurarArchivo(self.archivoInfo, dataBaseInfo)
@@ -115,6 +115,9 @@ class printtool:
             logger.info(f"Creando data base de {self.archivoExtras}")
 
         self.infoBase = ObtenerArchivo("data/costos.md")
+        if self.infoBase is None:
+            logger.error("Error fatal con data/costos.md")
+            exit(1)
         self.infoCostos = ObtenerArchivo(self.archivoInfo, False)
         self.infoExtras = ObtenerArchivo(self.archivoExtras, False)
 

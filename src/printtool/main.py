@@ -36,7 +36,6 @@ def buscarProyectos(Proyecto: list[str], ruta: str) -> list[str]:
 def main() -> None:
     """Función principal del programa."""
     
-    print(obtenerArchivoPaquete("printtool", "config/info.md"))
     args = Parámetros()
     
     if args.inventario:

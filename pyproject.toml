@@ -1,0 +1,35 @@
+[tool.black]
+line-length = 119
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "printtool"
+description = "Herramienta para calcular costos y administración de emprendimiento de impresión 3D"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "ChepeCarlos", email = "chepecarlos@chepecarlos.com" }]
+license = { file = "LICENSE" }
+dynamic = ["version", "dependencies"]
+
+[project.urls]
+Homepage = "https://github.com/chepecarlos/print-tool"
+Documentation = "https://github.com/chepecarlos/print-tool"
+Source = "https://github.com/chepecarlos/print-tool"
+Tracker = "https://github.com/chepecarlos/print-tool/issues"
+
+[project.scripts]
+printtool = "printtool.main:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["tests*", "testing*"]
+
+[tool.setuptools.dynamic]
+version = { file = ["VERSION"] }
+dependencies = { file = ["requirements.txt"] }
