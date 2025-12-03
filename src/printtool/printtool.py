@@ -45,8 +45,6 @@ class printtool:
     "SKU del modelo"
     linkModelo: str = ""
     "Link del modelo"
-    cantidadModelo: int = 1
-    "Cantidad de modelos en la impresión"
 
     precioVenta: float = 0
     "Precio de venta ingresado por el usuario"
@@ -138,7 +136,6 @@ class printtool:
         """Cargar información básica del modelo desde archivo info.md"""
         self.nombreModelo = self.infoCostos.get("nombre")
         self.linkModelo = self.infoCostos.get("link")
-        self.cantidadModelo = int(self.infoCostos.get("cantidad"))
         self.inventario = int(self.infoCostos.get("inventario", 0))
         self.precioVenta = self.infoCostos.get("precio_venta")
         self.skuModelo = self.infoCostos.get("sku", "")
@@ -209,15 +206,6 @@ class printtool:
             },
         ]
 
-        if self.cantidadModelo > 1:
-            dataInfo.append(
-                {
-                    "nivel": 3,
-                    "nombre": "Material por Unidad",
-                    "valor": f"{self.totalGramos/self.cantidadModelo:.2f} g",
-                }
-            )
-
         dataInfo = sorted(dataInfo, key=lambda x: x["nivel"])
 
         self.tablaInfo = ui.table(columns=columnaInfo, rows=dataInfo, row_key="nombre")
@@ -270,8 +258,6 @@ class printtool:
                     {"nombre": "Costo de impresión hora", "valor": 0},
                     {"nombre": "Costo ensamblado", "valor": 0},
                     {"nombre": "Costo Extra", "valor": 0},
-                    {"nombre": "Cantidad", "valor": 1},
-                    {"nombre": "Costo total", "valor": 0},
                     {"nombre": "Costo Unidad", "valor": 0},
                 ]
                 self.tablaCostos = ui.table(
@@ -290,6 +276,12 @@ class printtool:
                         "align": "left",
                     },
                     # {'name': 'archivo', 'label': 'Archivo', 'field': 'archivo'},
+                    {
+                        "name": "cantidad",
+                        "label": "Cantidad",
+                        "field": "cantidad",
+                        "sortable": False,
+                    },
                     {
                         "name": "material",
                         "label": "Material",
@@ -476,28 +468,38 @@ class printtool:
                         tipoArchivo = subfijo
                         nombreArchivo = archivo.removesuffix(subfijo)
                 rutaCompleta = os.path.join(self.folderProyecto, archivo)
-                infoGcode = self.cargarDataGcode(rutaCompleta, tipoArchivo)
+                infoGcode = self.cargarDataGcode(nombreArchivo, rutaCompleta, tipoArchivo)
 
                 if infoGcode.material is None or infoGcode.tiempo is None:
                     logger.warning(f"No se pudo obtener información de {archivo}, saltando...")
                     ui.notify(f"No se pudo obtener información de {archivo}, saltando...")
                     continue
 
-                horas = int(infoGcode.tiempo)
-                minutos = int((infoGcode.tiempo - horas) * 60)
+                tiempo = infoGcode.tiempo
+                material = infoGcode.material
+
+                if infoGcode.cantidad > 1:
+                    logger.info(f"Archivo {archivo} tiene {infoGcode.cantidad} piezas.")
+                    tiempo = tiempo / infoGcode.cantidad
+                    material = material / infoGcode.cantidad
+                    logger.info(f"Por pieza: {tiempo:.2f} horas, {material:.2f} gramos.")
+
+                horas = int(tiempo)
+                minutos = int((tiempo - horas) * 60)
                 tiempo_formateado = f"{horas}h {minutos}m"
                 dataArchivo.append(
                     {
                         "nombre": nombreArchivo,
                         "archivo": archivo,
-                        "material": f"{infoGcode.material}g",
+                        "material": f"{material:.2f}g",
                         "tiempo": f"{tiempo_formateado}",
+                        "cantidad": infoGcode.cantidad,
                     }
                 )
-                self.totalGramos += float(infoGcode.material)
-                self.totalHoras += float(infoGcode.tiempo)
+                self.totalGramos += material
+                self.totalHoras += tiempo
 
-        minutos = int((self.totalHoras - int(self.totalHoras)) * 60)
+        minutosTotal = int((self.totalHoras - int(self.totalHoras)) * 60)
 
         if dataArchivo == []:
             ui.notify(
@@ -510,10 +512,10 @@ class printtool:
 
         dataArchivo.append(
             {
-                "nombre": "Total",
+                "nombre": "Total por unidad",
                 "archivo": "",
                 "material": f"{self.totalGramos:.2f}g",
-                "tiempo": f"{int(self.totalHoras)}h {minutos}m",
+                "tiempo": f"{int(self.totalHoras)}h {minutosTotal}m",
             }
         )
 
@@ -531,12 +533,13 @@ class printtool:
 
         self.tablaInfo.update()
 
-    def cargarDataGcode(self, archivo: str, tipoArchivo: str) -> dataGcode:
+    def cargarDataGcode(self, nombre: str, archivo: str, tipoArchivo: str) -> dataGcode:
         """Cargar datos de un archivo G-code.
 
         Args:
+            nombre (str): Nombre del archivo G-code.
             archivo (str): Ruta al archivo G-code.
-            tipoArchivo (str): Tipo de archivo (ejemplo: .bgcode).
+            tipoArchivo (str): Tipo de archivo (ejemplo: .bgcode o .gcode).
 
         Returns:
             dataGcode: Objeto con la información extraída del archivo (material, tiempo, tipo, color).
@@ -545,6 +548,8 @@ class printtool:
         with codecs.open(archivo, "r", encoding="utf-8", errors="ignore") as fdata:
 
             infoGcode: dataGcode = dataGcode()
+
+            infoGcode.nombre = nombre
 
             data = fdata.read()
             lineas = data.split("\n")
@@ -582,6 +587,9 @@ class printtool:
 
                 if buscarGramos:
                     infoGcode.material = float(buscarGramos.group(1))
+                else:
+                    print("no se encontraron gramos")
+                    print(buscarGramos)
 
             logger.info(f"Buscar Gramos : {infoGcode.material}")
 
@@ -595,6 +603,14 @@ class printtool:
                 minutes = int(time_match.group(3))
                 seconds = int(time_match.group(4))
                 infoGcode.tiempo = hours + minutes / 60 + seconds / 3600
+
+            buscarPiezas = re.search(r"(\d+)pc", nombre)
+
+            if buscarPiezas:
+                infoGcode.cantidad = int(buscarPiezas.group(1))
+
+                infoGcode.materialPorPieza = infoGcode.material / infoGcode.cantidad
+                infoGcode.tiempoPorPieza = infoGcode.tiempo / infoGcode.cantidad
 
             return infoGcode
 
@@ -643,7 +659,7 @@ class printtool:
 
         costoHoraImpresion = costoHoraImpresion * self.totalHoras
         self.costoTotalImpresion = self.costoFilamento + self.costoEficiencia + costoHoraImpresion
-        self.costoUnidad = self.costoTotalImpresion / self.cantidadModelo + self.costoExtras + costoEnsamblado
+        self.costoUnidad = self.costoTotalImpresion + self.costoExtras + costoEnsamblado
         # TODO: Calcular costo por unidad en base a cuantos modelos hay en cada impresion
         # Considerar agregar en el nombre del archivo la cantidad de modelos
         # ejemplo 5pc
@@ -663,8 +679,6 @@ class printtool:
                 data["valor"] = f"${costoEnsamblado:.2f}"
             elif data["nombre"] == "Costo Extra":
                 data["valor"] = f"${self.costoExtras:.2f}"
-            elif data["nombre"] == "Cantidad":
-                data["valor"] = self.cantidadModelo
             elif data["nombre"] == "Costo total Impresion":
                 data["valor"] = f"${self.costoTotalImpresion:.2f}"
             elif data["nombre"] == "Costo Unidad":
@@ -775,12 +789,6 @@ class printtool:
 
         self.textoSKU = ui.input(label="SKU", value=self.skuModelo).classes("w-64")
 
-        self.textoCantidad = ui.input(
-            label="Cantidad Impresion",
-            value=self.cantidadModelo,
-            validation=self.validar_numero,
-        ).classes("w-64")
-
         self.textoDescripción = (
             ui.textarea(label="Descripción", value=self.descripciónModelo).props("clearable").classes("w-64")
         )
@@ -789,13 +797,12 @@ class printtool:
 
         ui.button("Guardar", on_click=self.guardarModelo).classes("w-64")
 
-    def guardarModelo(self):
+    def guardarModelo(self) -> None:
         "Guardar información del modelo en el archivo info.md"
 
         # Obtener valores de los campos
         self.nombreModelo = self.textoNombre.value
         self.inventario = int(self.textoInventario.value)
-        self.cantidadModelo = int(self.textoCantidad.value)
         self.linkModelo = self.textoLink.value
         self.skuModelo = self.textoSKU.value
         self.propiedadModelo = self.textoPropiedad.value
@@ -803,12 +810,6 @@ class printtool:
         self.descripciónModelo = self.textoDescripción.value
 
         SalvarValor(self.archivoInfo, "nombre", self.nombreModelo, local=False)
-        SalvarValor(
-            self.archivoInfo,
-            "cantidad",
-            self.cantidadModelo,
-            local=False,
-        )
         SalvarValor(self.archivoInfo, "link", self.linkModelo, local=False)
         SalvarValor(self.archivoInfo, "tipo", self.tipoModelo, local=False)
         SalvarValor(self.archivoInfo, "inventario", self.inventario, local=False)
@@ -819,8 +820,8 @@ class printtool:
         for file in self.tablaInfo.rows:
             if file["nombre"] == "Nombre":
                 file["valor"] = f"{self.nombreModelo}"
-            elif file["nombre"] == "Cantidad":
-                file["valor"] = f"{self.cantidadModelo}"
+            # elif file["nombre"] == "Cantidad":
+            #     file["valor"] = f"{self.cantidadModelo}"
             elif file["nombre"] == "Inventario":
                 file["valor"] = f"{self.inventario}"
             elif file["nombre"] == "Propiedad":
@@ -836,7 +837,13 @@ class printtool:
 
         ui.notify("Salvando Información")
 
-    def cargarGui(self, interface: bool = False):
+    def cargarGui(self, interface: bool = False) -> None:
+        """Cargar la interfaz gráfica de usuario.
+
+        Args:
+            interface (bool): Indica si se debe mostrar la interfaz completa con cabecera y pie de página.
+        """
+
         @ui.page("/")
         def paginaInicio():
 
@@ -882,7 +889,8 @@ class printtool:
                     with ui.row().classes("w-full justify-center items-center"):
                         ui.label("Creado por ChepeCarlos").classes("text-white")
 
-    def iniciarGui(self):
+    def iniciarGui(self) -> None:
+        """Iniciar la interfaz gráfica de usuario."""
 
         ui.run(
             native=False,
