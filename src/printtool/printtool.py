@@ -4,6 +4,8 @@ import codecs
 import re
 from pathlib import Path
 
+from printtool.dataGcode import dataGcode
+
 from printtool.MiLibrerias import (
     ObtenerArchivo,
     SalvarValor,
@@ -88,7 +90,7 @@ class printtool:
         self.totalGramos: float = 0
         self.totalHoras: float = 0
         self.precioVenta: float = 0
-        self.costoTotal: float = 0
+        self.costoTotalImpresion: float = 0
         self.costoExtras: float = 0
 
     #     @staticmethod
@@ -400,11 +402,10 @@ class printtool:
 
     def calculandoPrecioVenta(self):
 
-        ganancia = float(self.infoBase.get("ganancia", 10))
+        ganancia: float = float(self.infoBase.get("ganancia", 10))
 
-        self.costoPorModelo = self.costoTotal / self.cantidadModelo
-        precioAntesIva = self.costoPorModelo / (1 - ganancia / 100)
-        cantidadGanancia = precioAntesIva - self.costoPorModelo
+        precioAntesIva = self.costoUnidad / (1 - ganancia / 100)
+        cantidadGanancia = precioAntesIva - self.costoUnidad
         iva = precioAntesIva * 0.13
         precioSugerido = precioAntesIva + iva
 
@@ -414,17 +415,17 @@ class printtool:
         if self.precioVenta >= 0:
             ventaPrecioSinIva = self.precioVenta / 1.13
             ventaIva = self.precioVenta - ventaPrecioSinIva
-            ventaGanancia = ventaPrecioSinIva - self.costoPorModelo
+            ventaGanancia = ventaPrecioSinIva - self.costoUnidad
             if ventaGanancia < 0 or ventaPrecioSinIva == 0:
                 VentaPorcentajeGanancia = 0
             else:
-                VentaPorcentajeGanancia = (1 - (self.costoPorModelo / ventaPrecioSinIva)) * 100
+                VentaPorcentajeGanancia = (1 - (self.costoUnidad / ventaPrecioSinIva)) * 100
 
         dataPrecio = [
             {
                 "nombre": "Costo fabricación",
-                "valor": f"${self.costoPorModelo:.2f}",
-                "final": f"${self.costoPorModelo:.2f}",
+                "valor": f"${self.costoUnidad:.2f}",
+                "final": f"${self.costoUnidad:.2f}",
             },
             {
                 "nombre": "Porcentaje de Ganancia",
@@ -475,23 +476,37 @@ class printtool:
                         tipoArchivo = subfijo
                         nombreArchivo = archivo.removesuffix(subfijo)
                 rutaCompleta = os.path.join(self.folderProyecto, archivo)
-                dataGcode = self.cargarDataGcode(rutaCompleta, tipoArchivo)
+                infoGcode = self.cargarDataGcode(rutaCompleta, tipoArchivo)
 
-                horas = int(dataGcode["tiempo"])
-                minutos = int((dataGcode["tiempo"] - horas) * 60)
+                if infoGcode.material is None or infoGcode.tiempo is None:
+                    logger.warning(f"No se pudo obtener información de {archivo}, saltando...")
+                    ui.notify(f"No se pudo obtener información de {archivo}, saltando...")
+                    continue
+
+                horas = int(infoGcode.tiempo)
+                minutos = int((infoGcode.tiempo - horas) * 60)
                 tiempo_formateado = f"{horas}h {minutos}m"
                 dataArchivo.append(
                     {
                         "nombre": nombreArchivo,
                         "archivo": archivo,
-                        "material": f"{dataGcode['material']}g",
+                        "material": f"{infoGcode.material}g",
                         "tiempo": f"{tiempo_formateado}",
                     }
                 )
-                self.totalGramos += float(dataGcode["material"])
-                self.totalHoras += float(dataGcode["tiempo"])
+                self.totalGramos += float(infoGcode.material)
+                self.totalHoras += float(infoGcode.tiempo)
 
         minutos = int((self.totalHoras - int(self.totalHoras)) * 60)
+
+        if dataArchivo == []:
+            ui.notify(
+                "No se encontraron archivos G-code en la carpeta del proyecto.",
+                type="negative",
+                close_button="OK",
+            )
+            logger.warning("No se encontraron archivos G-code en la carpeta del proyecto.")
+            return
 
         dataArchivo.append(
             {
@@ -516,7 +531,7 @@ class printtool:
 
         self.tablaInfo.update()
 
-    def cargarDataGcode(self, archivo: str, tipoArchivo: str) -> dict[str, float]:
+    def cargarDataGcode(self, archivo: str, tipoArchivo: str) -> dataGcode:
         """Cargar datos de un archivo G-code.
 
         Args:
@@ -524,16 +539,12 @@ class printtool:
             tipoArchivo (str): Tipo de archivo (ejemplo: .bgcode).
 
         Returns:
-            dict (str, float): Diccionario con la información extraída del archivo (material, tiempo, tipo, color).
+            dataGcode: Objeto con la información extraída del archivo (material, tiempo, tipo, color).
         """
 
         with codecs.open(archivo, "r", encoding="utf-8", errors="ignore") as fdata:
-            info: dict[str, float] = {
-                "material": -1.0,
-                "tiempo": -1.0,
-                "tipo": -1.0,
-                "color": -1.0,
-            }
+
+            infoGcode: dataGcode = dataGcode()
 
             data = fdata.read()
             lineas = data.split("\n")
@@ -559,7 +570,7 @@ class printtool:
                     lineasDocumento,
                 )
                 if buscarGramos:
-                    info["material"] = (
+                    infoGcode.material = (
                         float(buscarGramos.group(1))
                         + float(buscarGramos.group(2))
                         + float(buscarGramos.group(3))
@@ -570,9 +581,9 @@ class printtool:
                 buscarGramos = re.search(r"filament used \[g\]\s?=\s?([0-9.]+)", lineasDocumento)
 
                 if buscarGramos:
-                    info["material"] = float(buscarGramos.group(1))
+                    infoGcode.material = float(buscarGramos.group(1))
 
-            logger.info(f"Buscar Gramos : {info['material']}")
+            logger.info(f"Buscar Gramos : {infoGcode.material}")
 
             time_match = re.search(
                 r"estimated printing time \(normal mode\)\s?=\s?(([0-9]+)h )?([0-9]+)m ([0-9]+)s",
@@ -583,9 +594,9 @@ class printtool:
                 hours = int(time_match.group(2)) if time_match.group(2) else 0  # Si no hay horas, usar 0
                 minutes = int(time_match.group(3))
                 seconds = int(time_match.group(4))
-                info["tiempo"] = hours + minutes / 60 + seconds / 3600
+                infoGcode.tiempo = hours + minutes / 60 + seconds / 3600
 
-            return info
+            return infoGcode
 
     def calcularCostos(self):
         """Calcular costos"""
@@ -631,11 +642,11 @@ class printtool:
         logger.info(f"Precio por gramo: {self.costoGramo}")
 
         costoHoraImpresion = costoHoraImpresion * self.totalHoras
-        self.costoTotal = (
-            self.costoFilamento + self.costoEficiencia + costoHoraImpresion + costoEnsamblado + self.costoExtras
-        )
-
-        self.costoUnidad = self.costoTotal / self.cantidadModelo
+        self.costoTotalImpresion = self.costoFilamento + self.costoEficiencia + costoHoraImpresion
+        self.costoUnidad = self.costoTotalImpresion / self.cantidadModelo + self.costoExtras + costoEnsamblado
+        # TODO: Calcular costo por unidad en base a cuantos modelos hay en cada impresion
+        # Considerar agregar en el nombre del archivo la cantidad de modelos
+        # ejemplo 5pc
 
         for data in self.tablaCostos.rows:
             if data["nombre"] == "Total filamento (g)":
@@ -654,8 +665,8 @@ class printtool:
                 data["valor"] = f"${self.costoExtras:.2f}"
             elif data["nombre"] == "Cantidad":
                 data["valor"] = self.cantidadModelo
-            elif data["nombre"] == "Costo total":
-                data["valor"] = f"${self.costoTotal:.2f}"
+            elif data["nombre"] == "Costo total Impresion":
+                data["valor"] = f"${self.costoTotalImpresion:.2f}"
             elif data["nombre"] == "Costo Unidad":
                 data["valor"] = f"${self.costoUnidad:.2f}"
 
