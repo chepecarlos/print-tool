@@ -587,11 +587,13 @@ class printtool:
 
                 if buscarGramos:
                     infoGcode.material = float(buscarGramos.group(1))
-                else:
-                    print("no se encontraron gramos")
-                    print(buscarGramos)
 
-            logger.info(f"Buscar Gramos : {infoGcode.material}")
+            if infoGcode.material == 0:
+                buscarGramos = re.search(r"(\d+)g", nombre)
+                if buscarGramos:
+                    infoGcode.material = float(buscarGramos.group(1))
+
+            logger.info(f"Gramos : {infoGcode.material}")
 
             time_match = re.search(
                 r"estimated printing time \(normal mode\)\s?=\s?(([0-9]+)h )?([0-9]+)m ([0-9]+)s",
@@ -603,6 +605,16 @@ class printtool:
                 minutes = int(time_match.group(3))
                 seconds = int(time_match.group(4))
                 infoGcode.tiempo = hours + minutes / 60 + seconds / 3600
+
+            if infoGcode.tiempo == 0:
+                buscarTiempo = re.search(r"(\d+)h", nombre)
+                if buscarTiempo:
+                    infoGcode.tiempo = float(buscarTiempo.group(1))
+                buscarTiempo = re.search(r"(\d+)m", nombre)
+                if buscarTiempo:
+                    infoGcode.tiempo += float(buscarTiempo.group(1)) / 60
+
+            logger.info(f"Tiempo(Horas) : {infoGcode.tiempo}")
 
             buscarPiezas = re.search(r"(\d+)pc", nombre)
 
@@ -621,7 +633,6 @@ class printtool:
             logger.error("Error fatal con data costos.md")
             exit(1)
         dataVentas = self.infoCostos
-        logger.info(f"Data ventas: {dataVentas}")
 
         costoHoraTrabajo = float(self.infoBase.get("hora_trabajo", 0))
         costoEnsamblado = (self.tiempoEnsamblado / 60) * costoHoraTrabajo
