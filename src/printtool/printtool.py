@@ -69,9 +69,6 @@ class printtool:
     inventario: int = 0
     "Cantidad de productos en inventario"
 
-    tablaInfo = None
-    "Tabla de información básica del modelo, para pestaña Info"
-
     tablaDataGcode = None
     "Tabla de datos de los archivos G-code (material, tiempo, tipo, color), para pestaña Modelo"
 
@@ -165,50 +162,33 @@ class printtool:
         if self.filamentoSeleccionado not in self.listaFilamentos:
             self.filamentoSeleccionado = 1
 
-    def cargarGuiInfo(self):
-        columnaInfo = [
-            {
-                "name": "nombre",
-                "label": "Nombre",
-                "field": "nombre",
-                "required": True,
-                "align": "left",
-            },
-            {
-                "name": "valor",
-                "label": "Referencia",
-                "field": "valor",
-                "required": True,
-                "align": "center",
-            },
-        ]
+    def cargarGuiInfo(self) -> None:
+        """Cargar la interfaz gráfica de usuario para la información básica del modelo."""
 
         dataInfo = [
-            {"nivel": 0, "nombre": "Nombre", "valor": self.nombreModelo},
-            {"nivel": 1, "nombre": "Propiedad", "valor": self.propiedadModelo},
-            {"nivel": 2, "nombre": "Tipo", "valor": self.tipoModelo},
-            {"nivel": 3, "nombre": "Inventario", "valor": self.inventario},
-            {"nivel": 4, "nombre": "Material", "valor": "PLA"},
+            {"key": "nombreModelo", "humano": "Nombre", "formato": lambda x: f"{x}"},
+            {"key": "propiedadModelo", "humano": "Propiedad", "formato": lambda x: f"{x}"},
+            {"key": "tipoModelo", "humano": "Tipo", "formato": lambda x: f"{x}"},
+            {"key": "inventario", "humano": "Inventario", "formato": lambda x: f"{x}"},
+            {"key": "skuModelo", "humano": "SKU", "formato": lambda x: f"{x}"},
+            # {"key": "Material", "humano": "Material", "formato": "PLA"},
+            {"key": "totalGramos", "humano": "Total Filamento", "formato": lambda x: f"{x:.2f}g"},
             {
-                "nivel": 5,
-                "nombre": "Total Filamento (g)",
-                "valor": f"{self.totalGramos:.2f}",
+                "key": "totalHoras",
+                "humano": "Tiempo impresión",
+                "formato": lambda x: f"{int(x)}h {int((x - int(x)) * 60)}m",
             },
-            {
-                "nivel": 6,
-                "nombre": "Tiempo impresión",
-                "valor": f"{int(self.totalHoras)}h {int((self.totalHoras - int(self.totalHoras)) * 60)}m",
-            },
-            {
-                "nivel": 7,
-                "nombre": "Precio",
-                "valor": (f"${self.precioVenta:.2f}" if self.precioVenta is not None else "$0.00"),
-            },
+            {"key": "precioVenta", "humano": "Precio", "formato": lambda x: f"${x:.2f}"},
         ]
+        with ui.grid(columns=2):
 
-        dataInfo = sorted(dataInfo, key=lambda x: x["nivel"])
-
-        self.tablaInfo = ui.table(columns=columnaInfo, rows=dataInfo, row_key="nombre")
+            for item in dataInfo:
+                ui.label(item["humano"])
+                ui.label().bind_text_from(
+                    self,
+                    item["key"],
+                    lambda x, transform_func=item["formato"]: transform_func(x),
+                )
 
     def cargarGuiCostos(self):
         with ui.scroll_area().classes("w-full h-100 border border-2 border-teal-600h").style("height: 75vh"):
@@ -445,11 +425,6 @@ class printtool:
         self.tablaPrecio.rows = dataPrecio
         self.tablaPrecio.update()
 
-        for valor in self.tablaInfo.rows:
-            if valor["nombre"] == "Precio":
-                valor["valor"] = f"${self.precioVenta:.2f}"
-        self.tablaInfo.update()
-
     def cargarDataArchivos(self):
         """Cargar datos de los archivos G-code en la carpeta del proyecto."""
 
@@ -524,14 +499,6 @@ class printtool:
 
         self.tablaDataGcode.rows = dataArchivo
         self.tablaDataGcode.update()
-
-        for file in self.tablaInfo.rows:
-            if file["nombre"] == "Total Filamento (g)":
-                file["valor"] = f"{self.totalGramos:.2f}g"
-            elif file["nombre"] == "Tiempo impresión":
-                file["valor"] = f"{int(self.totalHoras)}h {minutos}m"
-
-        self.tablaInfo.update()
 
     def cargarDataGcode(self, nombre: str, archivo: str, tipoArchivo: str) -> dataGcode:
         """Cargar datos de un archivo G-code.
@@ -828,24 +795,6 @@ class printtool:
         SalvarValor(self.archivoInfo, "descripción", self.descripciónModelo, local=False)
         SalvarValor(self.archivoInfo, "sku", self.skuModelo, local=False)
 
-        for file in self.tablaInfo.rows:
-            if file["nombre"] == "Nombre":
-                file["valor"] = f"{self.nombreModelo}"
-            # elif file["nombre"] == "Cantidad":
-            #     file["valor"] = f"{self.cantidadModelo}"
-            elif file["nombre"] == "Inventario":
-                file["valor"] = f"{self.inventario}"
-            elif file["nombre"] == "Propiedad":
-                file["valor"] = f"{self.propiedadModelo}"
-            elif file["nombre"] == "SKU":
-                file["valor"] = f"{self.skuModelo}"
-            elif file["nombre"] == "Link":
-                file["valor"] = f"{self.linkModelo}"
-            elif file["nombre"] == "Tipo":
-                file["valor"] = f"{self.tipoModelo}"
-
-        self.tablaInfo.update()
-
         ui.notify("Salvando Información")
 
     def cargarGui(self, interface: bool = False) -> None:
@@ -890,7 +839,9 @@ class printtool:
                     cabecera.classes("bg-teal-700 items-center justify-between")
                     cabecera.style("height: 5vh; padding: 1px")
                     with ui.row().classes("w-full justify-center items-center"):
-                        ui.label("PrintTool").classes("text-h5 px-8")
+                        ui.label("PrintTool").classes("text-h5")
+                        ui.space()
+                        ui.label(self.nombreModelo).bind_text_from(self, "nombreModelo").classes("text-h6")
                         ui.space()
                         ui.button(icon="power_settings_new", on_click=app.shutdown).props("color=negative")
 
