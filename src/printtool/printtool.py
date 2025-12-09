@@ -35,6 +35,20 @@ class printtool:
     costoUnidad: float = 0
     "Costos por unidad"
 
+    porcentajeGananciaBase: float = 0
+    "Porcentaje Ganancia de Referencia"
+    porcentajeGananciaFinal: float = 0
+    "Porcentaje Ganancia Final"
+
+    gananciaBase: float = 0
+    gananciaFinal: float = 0
+    precioSinIvaReferencia: float = 0
+    precioSinIvaFinal: float = 0
+    ivaReferencia: float = 0
+    ivaFinal: float = 0
+    precioVentaReferencia: float = 0
+    precioVentaFinal: float = 0
+
     totalHoras: float = 0
     "Total de horas de la impresión"
 
@@ -56,7 +70,7 @@ class printtool:
     linkModelo: str = ""
     "Link del modelo"
 
-    precioVenta: float = 0
+    precioVentaFinal: float = 0
     "Precio de venta ingresado por el usuario"
 
     tipoProductos: list[str] = ["desconocido", "alcancía", "maceta", "figuras", "otro"]
@@ -94,7 +108,7 @@ class printtool:
     def __init__(self) -> None:
         self.totalGramos: float = 0
         self.totalHoras: float = 0
-        self.precioVenta: float = 0
+        self.precioVentaFinal: float = 0
         self.costoTotalImpresion: float = 0
         self.costoExtras: float = 0
 
@@ -144,7 +158,7 @@ class printtool:
         self.nombreModelo = self.infoCostos.get("nombre")
         self.linkModelo = self.infoCostos.get("link")
         self.inventario = int(self.infoCostos.get("inventario", 0))
-        self.precioVenta = self.infoCostos.get("precio_venta")
+        self.precioVentaFinal = self.infoCostos.get("precio_venta")
         self.skuModelo = self.infoCostos.get("sku", "")
         self.propiedadModelo = self.infoCostos.get("propiedad", "")
         self.descripciónModelo = self.infoCostos.get("descripción", "")
@@ -188,7 +202,7 @@ class printtool:
                 "humano": "Tiempo impresión",
                 "formato": lambda x: f"{int(x)}h {int((x - int(x)) * 60)}m",
             },
-            {"key": "precioVenta", "humano": "Precio", "formato": lambda x: f"$ {x:.2f}"},
+            {"key": "precioVentaFinal", "humano": "Precio", "formato": lambda x: f"$ {x:.2f}"},
         ]
         with ui.grid(columns=2):
 
@@ -386,56 +400,24 @@ class printtool:
 
     def calculandoPrecioVenta(self):
 
-        ganancia: float = float(self.infoBase.get("ganancia", 10))
+        self.porcentajeGananciaBase: float = float(self.infoBase.get("ganancia", 10))
 
-        precioAntesIva = self.costoUnidad / (1 - ganancia / 100)
-        cantidadGanancia = precioAntesIva - self.costoUnidad
-        iva = precioAntesIva * 0.13
-        precioSugerido = precioAntesIva + iva
+        self.precioSinIvaReferencia = self.costoUnidad / (1 - self.porcentajeGananciaBase / 100)
+        self.gananciaBase = self.precioSinIvaReferencia - self.costoUnidad
+        self.ivaReferencia = self.precioSinIvaReferencia * 0.13
+        self.precioVentaReferencia = self.precioSinIvaReferencia + self.ivaReferencia
 
-        if self.precioVenta is None:
-            self.precioVenta = precioSugerido
+        if self.precioVentaFinal is None:
+            self.precioVentaFinal = self.precioVentaReferencia
 
-        if self.precioVenta >= 0:
-            ventaPrecioSinIva = self.precioVenta / 1.13
-            ventaIva = self.precioVenta - ventaPrecioSinIva
-            ventaGanancia = ventaPrecioSinIva - self.costoUnidad
-            if ventaGanancia < 0 or ventaPrecioSinIva == 0:
-                VentaPorcentajeGanancia = 0
+        if self.precioVentaFinal >= 0:
+            self.precioSinIvaFinal = self.precioVentaFinal / 1.13
+            self.ivaFinal = self.precioVentaFinal - self.precioSinIvaFinal
+            self.gananciaFinal = self.precioSinIvaFinal - self.costoUnidad
+            if self.gananciaFinal < 0 or self.precioSinIvaFinal == 0:
+                self.porcentajeGananciaFinal = 0
             else:
-                VentaPorcentajeGanancia = (1 - (self.costoUnidad / ventaPrecioSinIva)) * 100
-
-        dataPrecio = [
-            {
-                "nombre": "Costo fabricación",
-                "valor": f"${self.costoUnidad:.2f}",
-                "final": f"${self.costoUnidad:.2f}",
-            },
-            {
-                "nombre": "Porcentaje de Ganancia",
-                "valor": f"{ganancia:.2f} %",
-                "final": f"{VentaPorcentajeGanancia:.2f} %",
-            },
-            {
-                "nombre": "Ganancia",
-                "valor": f"${cantidadGanancia:.2f}",
-                "final": f"${ventaGanancia:.2f}",
-            },
-            {
-                "nombre": "Precio antes de iva",
-                "valor": f"${precioAntesIva:.2f}",
-                "final": f"${ventaPrecioSinIva:.2f}",
-            },
-            {"nombre": "Iva", "valor": f"${iva:.2f}", "final": f"${ventaIva:.2f}"},
-            {
-                "nombre": "Costo de venta",
-                "valor": f"${precioSugerido:.2f}",
-                "final": f"${self.precioVenta:.2f}",
-            },
-        ]
-
-        self.tablaPrecio.rows = dataPrecio
-        self.tablaPrecio.update()
+                self.porcentajeGananciaFinal = (1 - (self.costoUnidad / self.precioSinIvaFinal)) * 100
 
     def cargarDataArchivos(self):
         """Cargar datos de los archivos G-code en la carpeta del proyecto."""
@@ -642,12 +624,12 @@ class printtool:
         costoRecuperacionInversion = costoTotalImpresora / (self.tiempoTrabajo * self.vidaUtil)
         costoHora = (self.consumoPotencia / 1000) * self.costoElectricidad
         costoHoraImpresion = (costoRecuperacionInversion + costoHora) * (1 + self.errorFabricacion)
+        self.costoHoraImpresion = costoHoraImpresion * self.totalHoras
 
         logger.info(f"costo extras: {self.costoExtras}")
         logger.info(f"costo hora impresión: {self.costoHoraImpresion:.2f}")
         logger.info(f"Precio por gramo: {self.costoGramo}")
 
-        self.costoHoraImpresion = costoHoraImpresion * self.totalHoras
         self.costoTotalImpresion = self.costoFilamento + self.costoEficiencia + self.costoHoraImpresion
         self.costoUnidad = self.costoTotalImpresion + self.costoExtras + self.costoEnsamblado
         # TODO: Calcular costo por unidad en base a cuantos modelos hay en cada impresion
@@ -681,62 +663,79 @@ class printtool:
 
     def cargarGuiPrecio(self):
 
-        columns = [
-            {
-                "name": "nombre",
-                "label": "Nombre",
-                "field": "nombre",
-                "required": True,
-                "align": "left",
-            },
-            {
-                "name": "valor",
-                "label": "Referencia",
-                "field": "valor",
-                "required": True,
-                "align": "center",
-            },
-            {
-                "name": "final",
-                "label": "Final",
-                "field": "final",
-                "required": True,
-                "align": "center",
-            },
-        ]
-
         dataPrecio = [
-            {"nombre": "Costo fabricación"},
-            {"nombre": "Porcentaje de Ganancia"},
-            {"nombre": "Ganancia"},
-            {"nombre": "Precio antes de iva"},
-            {"nombre": "Iva"},
             {
-                "nombre": "Costo de venta",
-                "valor": f"${0:.2f}",
-                "final": f"${self.precioVenta:.2f}",
+                "referencia": "costoUnidad",
+                "final": "costoUnidad",
+                "humano": "Costo Fabricación",
+                "formato": lambda x: f"$ {x:.2f}",
+            },
+            {
+                "referencia": "porcentajeGananciaBase",
+                "final": "porcentajeGananciaFinal",
+                "humano": "Porcentaje de Ganancia",
+                "formato": lambda x: f"{x:.2f} %",
+            },
+            {
+                "referencia": "gananciaBase",
+                "final": "gananciaFinal",
+                "humano": "Ganancia",
+                "formato": lambda x: f"$ {x:.2f}",
+            },
+            {
+                "referencia": "precioSinIvaReferencia",
+                "final": "precioSinIvaFinal",
+                "humano": "Precio antes iva",
+                "formato": lambda x: f"$ {x:.2f}",
+            },
+            {
+                "referencia": "ivaReferencia",
+                "final": "ivaFinal",
+                "humano": "Iva",
+                "formato": lambda x: f"$ {x:.2f}",
+            },
+            {
+                "referencia": "precioVentaReferencia",
+                "final": "precioVentaFinal",
+                "humano": "Precio Venta",
+                "formato": lambda x: f"$ {x:.2f}",
             },
         ]
 
-        with ui.row().props("rounded outlined dense"):
-            self.textoVenta = ui.input(
-                label="Precio de Venta",
-                value=self.precioVenta,
-                validation=self.validar_numero,
-            ).props("rounded outlined dense")
-            ui.button(on_click=self.actualizarPrecios, icon="send")
-            self.textoVenta.on("keydown.enter", self.actualizarPrecios)
-
-        self.tablaPrecio = ui.table(columns=columns, rows=dataPrecio, row_key="nombre")
+        with ui.column().classes("w-full justify-center items-center"):
+            with ui.grid(columns=3).classes("justify-center items-center"):
+                ui.label()
+                ui.label("Referencia")
+                ui.label("Final")
+                for item in dataPrecio:
+                    ui.label(item["humano"])
+                    ui.label().bind_text_from(
+                        self,
+                        item["referencia"],
+                        lambda x, transform_func=item["formato"]: transform_func(x),
+                    )
+                    ui.label().bind_text_from(
+                        self,
+                        item["final"],
+                        lambda x, transform_func=item["formato"]: transform_func(x),
+                    )
+            with ui.row().props("rounded outlined dense"):
+                self.textoVenta = ui.input(
+                    label="Precio de Venta",
+                    value=self.precioVentaFinal,
+                    validation=self.validar_numero,
+                ).props("rounded outlined dense")
+                ui.button(on_click=self.actualizarPrecios, icon="send")
+                self.textoVenta.on("keydown.enter", self.actualizarPrecios)
 
     def actualizarPrecios(self):
-        self.precioVenta = float(self.textoVenta.value)
-        SalvarValor(self.archivoInfo, "precio_venta", self.precioVenta, local=False)
-        logger.info(f"Actualizar precios {self.precioVenta}")
+        self.precioVentaFinal = float(self.textoVenta.value)
+        SalvarValor(self.archivoInfo, "precio_venta", self.precioVentaFinal, local=False)
+        logger.info(f"Actualizar precios {self.precioVentaFinal}")
 
         self.cargarCostos()
 
-        ui.notify(f"Actualizando precios a ${self.precioVenta:.2f}")
+        ui.notify(f"Actualizando precios a ${self.precioVentaFinal:.2f}")
 
     def cargarGuiActualizar(self):
         "Crear interface para actualizar datos del modelo"
