@@ -24,6 +24,16 @@ class printtool:
 
     totalGramos: float = 0
     "Total de gramos de la impresión"
+    costoFilamento: float = 0
+    "Costo por modelos"
+    costoEficiencia: float = 0
+    "Costo por posible error"
+    costoHoraImpresion: float = 0
+    "Costo por uso de la maquina"
+    costoEnsamblado: float = 0
+    "Costo por ensamblado"
+    costoUnidad: float = 0
+    "Costos por unidad"
 
     totalHoras: float = 0
     "Total de horas de la impresión"
@@ -178,7 +188,7 @@ class printtool:
                 "humano": "Tiempo impresión",
                 "formato": lambda x: f"{int(x)}h {int((x - int(x)) * 60)}m",
             },
-            {"key": "precioVenta", "humano": "Precio", "formato": lambda x: f"${x:.2f}"},
+            {"key": "precioVenta", "humano": "Precio", "formato": lambda x: f"$ {x:.2f}"},
         ]
         with ui.grid(columns=2):
 
@@ -190,11 +200,47 @@ class printtool:
                     lambda x, transform_func=item["formato"]: transform_func(x),
                 )
 
-    def cargarGuiCostos(self):
-        with ui.scroll_area().classes("w-full h-100 border border-2 border-teal-600h").style("height: 75vh"):
+    def cargarGuiCostos(self) -> None:
+        """Cargar la interfaz gráfica de usuario para la pestaña de costos."""
+        with ui.scroll_area() as area:
+            area.classes("w-full h-100 border border-2 border-teal-600h")
+            area.style("height: 75vh")
+
+            dataCostos = [
+                {"key": "totalGramos", "humano": "Filamento por Unidad", "formato": lambda x: f"{x:.2f}g"},
+                {
+                    "key": "totalHoras",
+                    "humano": "Tiempo Impresión",
+                    "formato": lambda x: f"{int(x)}h {int((x - int(x)) * 60)}m",
+                },
+                {
+                    "key": "tiempoEnsamblado",
+                    "humano": "Tiempo Ensamblaje",
+                    "formato": lambda x: f"{int(x/60)}h {int(x - int(x/60)*60)}m",
+                },
+                {"key": "costoFilamento", "humano": "Costo de Filamento", "formato": lambda x: f"$ {x:.2f}"},
+                {"key": "costoEficiencia", "humano": "Costo por Eficiencia ", "formato": lambda x: f"$ {x:.2f}"},
+                {"key": "costoHoraImpresion", "humano": "Costo uso maquina", "formato": lambda x: f"$ {x:.2f}"},
+                {"key": "costoEnsamblado", "humano": "Costo ensamblado", "formato": lambda x: f"$ {x:.2f}"},
+                {"key": "costoExtras", "humano": "Costo Extras", "formato": lambda x: f"$ {x:.2f}"},
+                {"key": "costoUnidad", "humano": "Costo Total", "formato": lambda x: f"$ {x:.2f}"},
+            ]
+
+            with ui.column().classes("w-full justify-center items-center"):
+                ui.button("Recargar Costos", on_click=self.cargarCostos).classes("w-64")
+                ui.label("Costos por Unidad").classes("justify-center items-center")
+                with ui.grid(columns=2).classes("justify-center items-center"):
+
+                    for item in dataCostos:
+                        ui.label(item["humano"])
+                        ui.label().bind_text_from(
+                            self,
+                            item["key"],
+                            lambda x, transform_func=item["formato"]: transform_func(x),
+                        )
+
             with ui.row().classes("w-full justify-center items-center"):
                 with ui.column().classes("justify-center items-center"):
-                    ui.button("Recargar Costos", on_click=self.cargarCostos).classes("w-64")
 
                     with ui.row().props("rounded outlined dense"):
                         self.textoTiempoEnsamblado = ui.input(
@@ -212,40 +258,6 @@ class printtool:
                             label="Material",
                             on_change=self.seleccionarFilamento,
                         ).classes("min-w-64")
-
-                infoCostos = [
-                    {
-                        "name": "nombre",
-                        "label": "Nombre",
-                        "field": "nombre",
-                        "required": True,
-                        "align": "left",
-                    },
-                    {
-                        "name": "valor",
-                        "label": "Referencia",
-                        "field": "valor",
-                        "required": True,
-                        "align": "center",
-                    },
-                ]
-
-                dataCostos = [
-                    {"nombre": "Total filamento (g)", "valor": 0},
-                    {"nombre": "Tiempo Ensamblaje (m)", "valor": 0},
-                    {"nombre": "Costo Material", "valor": 0},
-                    {"nombre": "Eficiencia filamento", "valor": 0},
-                    {"nombre": "Costo de impresión hora", "valor": 0},
-                    {"nombre": "Costo ensamblado", "valor": 0},
-                    {"nombre": "Costo Extra", "valor": 0},
-                    {"nombre": "Costo Unidad", "valor": 0},
-                ]
-                self.tablaCostos = ui.table(
-                    columns=infoCostos,
-                    rows=dataCostos,
-                    row_key="nombre",
-                )
-                self.tablaCostos.classes("w-100")
 
                 infoArchivo = [
                     {
@@ -323,7 +335,7 @@ class printtool:
     def actualizarEnsamblado(self):
         self.tiempoEnsamblado = float(self.textoTiempoEnsamblado.value)
         SalvarValor(self.archivoInfo, "tiempo_ensamblaje", self.tiempoEnsamblado, local=False)
-        self.cargarCostos()
+        # self.cargarCostos()
         ui.notify(f"Tiempo de ensamblado actualizado a {self.tiempoEnsamblado} minutos")
 
     def cargarCostos(self):
@@ -602,7 +614,7 @@ class printtool:
         dataVentas = self.infoCostos
 
         costoHoraTrabajo = float(self.infoBase.get("hora_trabajo", 0))
-        costoEnsamblado = (self.tiempoEnsamblado / 60) * costoHoraTrabajo
+        self.costoEnsamblado = (self.tiempoEnsamblado / 60) * costoHoraTrabajo
 
         if self.filamentoSeleccionado is not None:
             for filamento in self.filamentosDisponibles:
@@ -632,37 +644,15 @@ class printtool:
         costoHoraImpresion = (costoRecuperacionInversion + costoHora) * (1 + self.errorFabricacion)
 
         logger.info(f"costo extras: {self.costoExtras}")
-        logger.info(f"costo hora impresión: {costoHoraImpresion:.2f}")
+        logger.info(f"costo hora impresión: {self.costoHoraImpresion:.2f}")
         logger.info(f"Precio por gramo: {self.costoGramo}")
 
-        costoHoraImpresion = costoHoraImpresion * self.totalHoras
-        self.costoTotalImpresion = self.costoFilamento + self.costoEficiencia + costoHoraImpresion
-        self.costoUnidad = self.costoTotalImpresion + self.costoExtras + costoEnsamblado
+        self.costoHoraImpresion = costoHoraImpresion * self.totalHoras
+        self.costoTotalImpresion = self.costoFilamento + self.costoEficiencia + self.costoHoraImpresion
+        self.costoUnidad = self.costoTotalImpresion + self.costoExtras + self.costoEnsamblado
         # TODO: Calcular costo por unidad en base a cuantos modelos hay en cada impresion
         # Considerar agregar en el nombre del archivo la cantidad de modelos
         # ejemplo 5pc
-
-        for data in self.tablaCostos.rows:
-            if data["nombre"] == "Total filamento (g)":
-                data["valor"] = f"{self.totalGramos:.2f}g"
-            elif data["nombre"] == "Tiempo Ensamblaje (m)":
-                data["valor"] = f"{self.tiempoEnsamblado:.2f} m"
-            elif data["nombre"] == "Costo Material":
-                data["valor"] = f"${self.costoFilamento:.2f}"
-            elif data["nombre"] == "Eficiencia filamento":
-                data["valor"] = f"${self.costoEficiencia:.2f}"
-            elif data["nombre"] == "Costo de impresión hora":
-                data["valor"] = f"${costoHoraImpresion:.2f}"
-            elif data["nombre"] == "Costo ensamblado":
-                data["valor"] = f"${costoEnsamblado:.2f}"
-            elif data["nombre"] == "Costo Extra":
-                data["valor"] = f"${self.costoExtras:.2f}"
-            elif data["nombre"] == "Costo total Impresion":
-                data["valor"] = f"${self.costoTotalImpresion:.2f}"
-            elif data["nombre"] == "Costo Unidad":
-                data["valor"] = f"${self.costoUnidad:.2f}"
-
-        self.tablaCostos.update()
 
     def seleccionarFilamento(self):
         """Seleccionar filamento"""
