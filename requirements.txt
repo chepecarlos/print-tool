@@ -1,9 +1,10 @@
-nicegui
+nicegui>=3.4.0
 
 python-telegram-bot
 paho-mqtt
 pywebview
-pywebview[qt]
+pywebview[gtk]
+# pywebview[qt]
 importlib-resources
 
 # Dependencia de submodulo MiLibrerias

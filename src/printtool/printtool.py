@@ -1,4 +1,4 @@
-from nicegui import ui, app
+from nicegui import ui, app, run
 import os
 import codecs
 import re
@@ -15,6 +15,9 @@ from printtool.MiLibrerias import (
     obtenerArchivoPaquete,
     ConfigurarLogging,
 )
+
+from printtool.extrasGui import seleccionarFolderThinter
+
 
 logger = ConfigurarLogging(__name__)
 
@@ -764,6 +767,17 @@ class printtool:
 
         ui.button("Guardar", on_click=self.guardarModelo).classes("w-64")
 
+    async def buscarFolder(self) -> None:
+        ui.notify("Abriendo selector...", type="info")
+
+        folderBuscado: str = await run.io_bound(seleccionarFolderThinter)
+        if folderBuscado:
+            self.inputFolder.set_value(folderBuscado)
+            self.folderProyecto = folderBuscado
+            ui.notify(f"Carpeta: {folderBuscado}", type="positive")
+        else:
+            ui.notify("Cancelado", type="warning")
+
     def guardarModelo(self) -> None:
         "Guardar información del modelo en el archivo info.md"
 
@@ -823,6 +837,32 @@ class printtool:
                         row.classes("w-full justify-center items-center")
                         self.cargarGuiActualizar()
 
+            with ui.dialog() as dialog, ui.card().classes("w-full max-w-lg mx-auto q-mt-xl p-4"):
+                ui.label("Seleccionar carpeta de proyecto").classes("text-h6")
+
+                self.inputFolder = (
+                    ui.input(
+                        value=str(self.folderProyecto),
+                        label="Ruta seleccionada",
+                    )
+                    .classes("w-full")
+                    .props("readonly")
+                )
+
+                with ui.button_group().props("rounded").classes("bg-teal-00"):
+                    ui.button(
+                        "Buscar",
+                        on_click=self.buscarFolder,
+                    ).props("icon=folder")
+                    ui.button(
+                        "Aceptar",
+                        on_click=dialog.close,
+                    ).props("icon=done")
+
+            async def show():
+                result = await dialog
+                ui.notify(f"You chose {result}")
+
             if interface:
                 with ui.header(elevated=True) as cabecera:
                     cabecera.classes("bg-teal-700 items-center justify-between")
@@ -832,7 +872,16 @@ class printtool:
                         ui.space()
                         ui.label(self.nombreModelo).bind_text_from(self, "nombreModelo").classes("text-h6")
                         ui.space()
-                        ui.button(icon="power_settings_new", on_click=app.shutdown).props("color=negative")
+
+                        with ui.button(icon="menu") as botón:
+                            botón.props("color=bg-teal-700")
+                            with ui.menu() as menu:
+                                menu.classes("items-center")
+                                ui.menu_item("Cambiar Proyecto", on_click=show)
+                                ui.separator()
+                                with ui.button(icon="power_settings_new", on_click=app.shutdown) as botónApagar:
+                                    botónApagar.props("color=negative")
+                                    botónApagar.classes("w-full justify-center items-center")
 
                 with ui.footer() as pie:
                     pie.classes("bg-teal-700")
@@ -844,7 +893,7 @@ class printtool:
         """Iniciar la interfaz gráfica de usuario."""
 
         ui.run(
-            native=False,
+            native=True,
             reload=False,
             dark=True,
             show=False,
