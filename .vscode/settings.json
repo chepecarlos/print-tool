@@ -1,5 +1,5 @@
 {
-  "cSpell.words": ["Gcode", "printtool"],
+  "cSpell.words": ["Gcode", "printtool", "Spoolman"],
   "search.exclude": {
     "**/node_modules": true,
     "**/.git": true,

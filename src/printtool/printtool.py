@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from printtool.dataGcode import dataGcode
+from printtool.costosImpresora import dataImpresora
 
 from printtool.MiLibrerias import (
     ObtenerArchivo,
@@ -51,6 +52,7 @@ class printtool:
     ivaFinal: float = 0
     precioVentaReferencia: float = 0
     precioVentaFinal: float = 0
+    precioFilamento: float = 0
 
     totalHoras: float = 0
     "Total de horas de la impresión"
@@ -82,7 +84,11 @@ class printtool:
     "Folder del proyecto"
 
     archivoInfo: str = None
+    "Archivo de información del modelo "
     archivoExtras: str = None
+    "Archivos de costos Extras del modelo como pegamento o tornillo"
+    archivoConfig: str = "data/costos.md"
+    "Archivo de información para calculo de costos"
 
     infoBase: dict[str, float] = None
     """Información base para cálculos de costos
@@ -92,6 +98,7 @@ class printtool:
         Vida Util
         Ganancia
     """
+    infoCostos: dict[str, float] = None
 
     inventario: int = 0
     "Cantidad de productos en inventario"
@@ -107,6 +114,14 @@ class printtool:
     "tab para precios"
     tabData: ui.tab = None
     "tab para datos"
+
+    símboloMoneda: str = "$"
+
+    infoImpresora: dataImpresora = dataImpresora()
+    "Información del impresora para calculo de costos"
+
+    urlSpoolman: str = ""
+    "Url para hacer consultas de filamentos"
 
     def __init__(self) -> None:
         self.totalGramos: float = 0
@@ -131,14 +146,21 @@ class printtool:
             SalvarArchivo(self.archivoExtras, data)
             logger.info(f"Creando data base de {self.archivoExtras}")
 
-        self.infoBase = ObtenerArchivo("data/costos.md")
+        self.infoBase = ObtenerArchivo(self.archivoConfig)
         if self.infoBase is None:
             logger.error("Error fatal con data/costos.md")
             exit(1)
         self.infoCostos = ObtenerArchivo(self.archivoInfo, False)
         self.infoExtras = ObtenerArchivo(self.archivoExtras, False)
 
+        self.cargarConfig()
         self.cargarInfoBasica()
+
+    def cargarConfig(self):
+
+        self.urlSpoolman = self.infoBase.get("url_spoolman")
+        self.precioFilamento = self.infoBase.get("precio_filamento")
+        pass
 
     def configurarData(self) -> None:
         """Configurar la carpeta del proyecto y los archivos de información."""
@@ -158,6 +180,17 @@ class printtool:
 
     def cargarInfoBasica(self) -> None:
         """Cargar información básica del modelo desde archivo info.md"""
+
+        self.símboloMoneda = self.infoBase.get("simbolo", "$")
+
+        self.infoImpresora.nombre = self.infoBase.get("nombre_impresora", "")
+        self.infoImpresora.costo = self.infoBase.get("costo_impresora", 0)
+        self.infoImpresora.envio = self.infoBase.get("envio_impresora", 0)
+        self.infoImpresora.mantenimiento = self.infoBase.get("mantenimiento_impresora", 0)
+        self.infoImpresora.vidaUtil = self.infoBase.get("vida_util_impresora", 0)
+        self.infoImpresora.consumo = self.infoBase.get("consumo_impresora", 0)
+        self.infoImpresora.tiempoTrabajo = self.infoBase.get("tiempo_trabajo_impresora", 0)
+
         self.nombreModelo = self.infoCostos.get("nombre")
         self.linkModelo = self.infoCostos.get("link")
         self.inventario = int(self.infoCostos.get("inventario", 0))
@@ -184,7 +217,7 @@ class printtool:
             precio = filamento.get("precio", "")
             material = filamento.get("material", "")
             if id is not None:
-                self.listaFilamentos[id] = f"{nombre}-{material} ${precio:.02f}"
+                self.listaFilamentos[id] = f"{nombre}-{material} {self.símboloMoneda}{precio:.02f}"
 
         if self.filamentoSeleccionado not in self.listaFilamentos:
             self.filamentoSeleccionado = 1
@@ -205,7 +238,7 @@ class printtool:
                 "humano": "Tiempo impresión",
                 "formato": lambda x: f"{int(x)}h {int((x - int(x)) * 60)}m",
             },
-            {"key": "precioVentaFinal", "humano": "Precio", "formato": lambda x: f"$ {x:.2f}"},
+            {"key": "precioVentaFinal", "humano": "Precio", "formato": lambda x: f"{self.símboloMoneda} {x:.2f}"},
         ]
         with ui.grid(columns=2):
 
@@ -235,12 +268,28 @@ class printtool:
                     "humano": "Tiempo Ensamblaje",
                     "formato": lambda x: f"{int(x/60)}h {int(x - int(x/60)*60)}m",
                 },
-                {"key": "costoFilamento", "humano": "Costo de Filamento", "formato": lambda x: f"$ {x:.2f}"},
-                {"key": "costoEficiencia", "humano": "Costo por Eficiencia ", "formato": lambda x: f"$ {x:.2f}"},
-                {"key": "costoHoraImpresion", "humano": "Costo uso maquina", "formato": lambda x: f"$ {x:.2f}"},
-                {"key": "costoEnsamblado", "humano": "Costo ensamblado", "formato": lambda x: f"$ {x:.2f}"},
-                {"key": "costoExtras", "humano": "Costo Extras", "formato": lambda x: f"$ {x:.2f}"},
-                {"key": "costoUnidad", "humano": "Costo Total", "formato": lambda x: f"$ {x:.2f}"},
+                {
+                    "key": "costoFilamento",
+                    "humano": "Costo de Filamento",
+                    "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
+                },
+                {
+                    "key": "costoEficiencia",
+                    "humano": "Costo por Eficiencia ",
+                    "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
+                },
+                {
+                    "key": "costoHoraImpresion",
+                    "humano": "Costo uso maquina",
+                    "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
+                },
+                {
+                    "key": "costoEnsamblado",
+                    "humano": "Costo ensamblado",
+                    "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
+                },
+                {"key": "costoExtras", "humano": "Costo Extras", "formato": lambda x: f"{self.símboloMoneda} {x:.2f}"},
+                {"key": "costoUnidad", "humano": "Costo Total", "formato": lambda x: f"{self.símboloMoneda} {x:.2f}"},
             ]
 
             with ui.column().classes("w-full justify-center items-center"):
@@ -372,9 +421,9 @@ class printtool:
 
         if self.infoExtras is not None:
             for extra in self.infoExtras:
-                dataCostos.append({"extra": extra, "precio": f"${self.infoExtras[extra]:.2f}"})
+                dataCostos.append({"extra": extra, "precio": f"{self.símboloMoneda}{self.infoExtras[extra]:.2f}"})
                 self.costoExtras += float(self.infoExtras[extra])
-        dataCostos.append({"extra": "Total", "precio": f"${self.costoExtras:.2f}"})
+        dataCostos.append({"extra": "Total", "precio": f"{self.símboloMoneda}{self.costoExtras:.2f}"})
 
         with self.tablaDataExtras as tabla:
             with tabla.add_slot("bottom-row"):
@@ -671,7 +720,7 @@ class printtool:
                 "referencia": "costoUnidad",
                 "final": "costoUnidad",
                 "humano": "Costo Fabricación",
-                "formato": lambda x: f"$ {x:.2f}",
+                "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
             },
             {
                 "referencia": "porcentajeGananciaBase",
@@ -683,25 +732,25 @@ class printtool:
                 "referencia": "gananciaBase",
                 "final": "gananciaFinal",
                 "humano": "Ganancia",
-                "formato": lambda x: f"$ {x:.2f}",
+                "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
             },
             {
                 "referencia": "precioSinIvaReferencia",
                 "final": "precioSinIvaFinal",
                 "humano": "Precio antes iva",
-                "formato": lambda x: f"$ {x:.2f}",
+                "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
             },
             {
                 "referencia": "ivaReferencia",
                 "final": "ivaFinal",
                 "humano": "Iva",
-                "formato": lambda x: f"$ {x:.2f}",
+                "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
             },
             {
                 "referencia": "precioVentaReferencia",
                 "final": "precioVentaFinal",
                 "humano": "Precio Venta",
-                "formato": lambda x: f"$ {x:.2f}",
+                "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
             },
         ]
 
@@ -738,7 +787,7 @@ class printtool:
 
         self.cargarCostos()
 
-        ui.notify(f"Actualizando precios a ${self.precioVentaFinal:.2f}")
+        ui.notify(f"Actualizando precios a {self.símboloMoneda}{self.precioVentaFinal:.2f}")
 
     def cargarGuiActualizar(self):
         "Crear interface para actualizar datos del modelo"
@@ -807,6 +856,134 @@ class printtool:
             interface (bool): Indica si se debe mostrar la interfaz completa con cabecera y pie de página.
         """
 
+        @ui.page("/config")
+        def paginaConfigurar():
+
+            def salvarSímbolo() -> None:
+                if inputSímbolo.value != "" and inputSímbolo.value != self.símboloMoneda:
+                    self.símboloMoneda = inputSímbolo.value
+                    ui.notify("Actualizando Símbolo {self.símboloMoneda}")
+                    inputCostoImpresora.props(f"prefix={self.símboloMoneda}")
+                    inputEnvioImpresora.props(f"prefix={self.símboloMoneda}")
+
+                pasos.next()
+
+            def salvarConfiguration() -> None:
+                ui.notify("Se actualizo las configuraciones")
+
+                self.urlSpoolman = inputSpoolman.value
+
+                self.infoImpresora.nombre = inputNombre.value
+                self.infoImpresora.costo = inputCostoImpresora.value
+                self.infoImpresora.envio = inputEnvioImpresora.value
+                self.infoImpresora.mantenimiento = inputMantenimiento.value
+                self.infoImpresora.vidaUtil = inputVidaUtil.value
+                self.infoImpresora.consumo = inputConsumo.value
+                self.infoImpresora.tiempoTrabajo = inputTiempoTrabajo.value
+
+                SalvarValor(self.archivoConfig, "url_spoolman", self.urlSpoolman)
+
+                SalvarValor(self.archivoConfig, "nombre_impresora", self.infoImpresora.nombre)
+                SalvarValor(self.archivoConfig, "costo_impresora", self.infoImpresora.costo)
+                SalvarValor(self.archivoConfig, "envio_impresora", self.infoImpresora.envio)
+                SalvarValor(self.archivoConfig, "mantenimiento_impresora", self.infoImpresora.mantenimiento)
+                SalvarValor(self.archivoConfig, "vida_util_impresora", self.infoImpresora.vidaUtil)
+                SalvarValor(self.archivoConfig, "consumo_impresora", self.infoImpresora.consumo)
+                SalvarValor(self.archivoConfig, "tiempo_trabajo_impresora", self.infoImpresora.tiempoTrabajo)
+
+            with ui.stepper().props("vertical").classes("w-full") as pasos:
+                pasos.classes("bg-teal-00")
+
+                with ui.step("Básico").classes("bg-teal-00"):
+                    inputSímbolo = ui.input(label="Símbolo Modena", value=self.símboloMoneda)
+                    inputNombre = ui.input(label="Nombre Impresora", value=self.infoImpresora.nombre)
+
+                    with ui.stepper_navigation():
+                        ui.button("Siguiente", on_click=salvarSímbolo)
+
+                with ui.step("Impresora"):
+                    inputCostoImpresora = ui.number(label="Costo Impresora", value=self.infoImpresora.costo, step=1)
+                    inputCostoImpresora.props(f"prefix={self.símboloMoneda}")
+
+                    inputEnvioImpresora = ui.number(label="Envió Impresora", value=self.infoImpresora.envio)
+                    inputEnvioImpresora.props(f"prefix={self.símboloMoneda}")
+
+                    inputMantenimiento = ui.number(label="Mantenimiento Anual", value=self.infoImpresora.mantenimiento)
+                    inputMantenimiento.props(f"prefix={self.símboloMoneda}")
+
+                    inputVidaUtil = ui.number(label="Vida util", value=self.infoImpresora.vidaUtil)
+                    inputVidaUtil.props("suffix=años")
+
+                    inputTiempoTrabajo = ui.number(label="Tiempo Trabajo", value=self.infoImpresora.tiempoTrabajo)
+                    inputTiempoTrabajo.props("prefix=%")
+
+                    inputConsumo = ui.number(label="Consumo", value=self.infoImpresora.consumo)
+                    inputConsumo.props("suffix=watts")
+
+                    with ui.stepper_navigation():
+                        ui.button("Siguiente", on_click=pasos.next)
+                        ui.button("Anterior", on_click=pasos.previous).props("flat")
+
+                with ui.step("Ensamblaje"):
+                    inputTrabajo = ui.number(label="Hora trabajo", value=self.infoImpresora.envio)
+                    inputTrabajo.props(f"prefix={self.símboloMoneda}")
+
+                    inputKWH = ui.number(label="Costo kWh", value=self.infoImpresora.envio)
+                    inputKWH.props(f"prefix={self.símboloMoneda}")
+
+                    inputMerma = ui.number(label="Merma en Fabricación", value=self.infoImpresora.envio)
+                    inputMerma.props("prefix=%")
+                    with inputMerma:
+                        ui.tooltip("")
+
+                    with ui.stepper_navigation():
+                        ui.button("Siguiente", on_click=pasos.next)
+                        ui.button("Anterior", on_click=pasos.previous).props("flat")
+
+                with ui.step("Spoolman"):
+                    ui.label("Colección con API de filamento")
+
+                    inputSpoolman = ui.input(label="URL del servicio de Spoolman", value=self.urlSpoolman)
+
+                    inputFilamento = ui.number(label="Precio Filamento (Si no Spoolman)", value=self.precioFilamento)
+                    inputFilamento.props(f"prefix={self.símboloMoneda}")
+
+                    with ui.stepper_navigation():
+                        ui.button("Siguiente", on_click=pasos.next)
+                        ui.button("Anterior", on_click=pasos.previous).props("flat")
+
+                with ui.step("Ganancia"):
+                    inputGanancia = ui.number(label="Ganancia", value=self.infoImpresora.envio)
+                    inputGanancia.props("prefix=%")
+
+                    with ui.stepper_navigation():
+                        ui.button("Salvar", on_click=salvarConfiguration)
+                        ui.button("Anterior", on_click=pasos.previous).props("flat")
+
+                inputImpresora = {
+                    inputSímbolo,
+                    inputNombre,
+                    inputCostoImpresora,
+                    inputEnvioImpresora,
+                    inputMantenimiento,
+                    inputVidaUtil,
+                    inputTiempoTrabajo,
+                    inputConsumo,
+                    inputSpoolman,
+                    inputFilamento,
+                    inputTrabajo,
+                    inputGanancia,
+                    inputMerma,
+                    inputKWH,
+                }
+
+                anchoInput: str = "w-60"
+                for entrada in inputImpresora:
+                    entrada.classes(anchoInput)
+
+            agregarInterface(interface)
+            return
+
         @ui.page("/")
         def paginaInicio():
 
@@ -837,6 +1014,13 @@ class printtool:
                         row.classes("w-full justify-center items-center")
                         self.cargarGuiActualizar()
 
+            agregarInterface(interface)
+
+        def agregarInterface(interface: bool):
+
+            if not interface:
+                return
+
             with ui.dialog() as dialog, ui.card().classes("w-full max-w-lg mx-auto q-mt-xl p-4"):
                 ui.label("Seleccionar carpeta de proyecto").classes("text-h6")
 
@@ -863,37 +1047,40 @@ class printtool:
                 result = await dialog
                 ui.notify(f"You chose {result}")
 
-            if interface:
-                with ui.header(elevated=True) as cabecera:
-                    cabecera.classes("bg-teal-700 items-center justify-between")
-                    cabecera.style("height: 5vh; padding: 1px")
-                    with ui.row().classes("w-full justify-center items-center"):
-                        ui.label("PrintTool").classes("text-h5")
-                        ui.space()
-                        ui.label(self.nombreModelo).bind_text_from(self, "nombreModelo").classes("text-h6")
-                        ui.space()
+            with ui.header(elevated=True) as cabecera:
+                cabecera.classes("bg-teal-700 items-center justify-between")
+                cabecera.style("height: 5vh; padding: 1px")
+                with ui.row().classes("w-full justify-center items-center"):
+                    ui.label("PrintTool").classes("text-h5")
+                    ui.space()
+                    ui.label(self.nombreModelo).bind_text_from(self, "nombreModelo").classes("text-h6")
+                    ui.space()
 
-                        with ui.button(icon="menu") as botón:
-                            botón.props("color=bg-teal-700")
-                            with ui.menu() as menu:
-                                menu.classes("items-center")
-                                ui.menu_item("Cambiar Proyecto", on_click=show)
-                                ui.separator()
-                                with ui.button(icon="power_settings_new", on_click=app.shutdown) as botónApagar:
-                                    botónApagar.props("color=negative")
-                                    botónApagar.classes("w-full justify-center items-center")
+                    with ui.button(icon="menu") as botón:
+                        botón.props("color=bg-teal-700")
+                        with ui.menu() as menu:
+                            menu.classes("items-center")
+                            ui.menu_item("Cambiar Proyecto", on_click=show)
+                            with ui.column().classes("w-full justify-center items-center"):
+                                ui.link("Inicio", paginaInicio)
+                                ui.link("Config", paginaConfigurar)
+                            ui.separator()
+                            with ui.button(icon="power_settings_new", on_click=app.shutdown) as botónApagar:
+                                botónApagar.props("color=negative")
+                                botónApagar.classes("w-full justify-center items-center")
 
-                with ui.footer() as pie:
-                    pie.classes("bg-teal-700")
-                    pie.style("height: 5vh; padding: 1px")
-                    with ui.row().classes("w-full justify-center items-center"):
-                        ui.label("Creado por ChepeCarlos").classes("text-white")
+            with ui.footer() as pie:
+                pie.classes("bg-teal-700")
+                pie.style("height: 5vh; padding: 1px")
+                with ui.row().classes("w-full justify-center items-center"):
+                    ui.label("Creado por ChepeCarlos").classes("text-white")
 
     def iniciarGui(self) -> None:
         """Iniciar la interfaz gráfica de usuario."""
 
         ui.run(
             native=True,
+            window_size=(1024, 786),
             reload=False,
             dark=True,
             show=False,
