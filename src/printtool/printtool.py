@@ -116,6 +116,7 @@ class printtool:
     "tab para datos"
 
     símboloMoneda: str = "$"
+    "Símbolo de Moneda para interface"
 
     infoImpresora: dataImpresora = dataImpresora()
     "Información del impresora para calculo de costos"
@@ -160,7 +161,6 @@ class printtool:
 
         self.urlSpoolman = self.infoBase.get("url_spoolman")
         self.precioFilamento = self.infoBase.get("precio_filamento")
-        pass
 
     def configurarData(self) -> None:
         """Configurar la carpeta del proyecto y los archivos de información."""
@@ -190,6 +190,12 @@ class printtool:
         self.infoImpresora.vidaUtil = self.infoBase.get("vida_util_impresora", 0)
         self.infoImpresora.consumo = self.infoBase.get("consumo_impresora", 0)
         self.infoImpresora.tiempoTrabajo = self.infoBase.get("tiempo_trabajo_impresora", 0)
+
+        self.errorFabricacion = float(self.infoBase.get("error_fabricacion", 0))
+        self.costoElectricidad: float = float(self.infoBase.get("costo_electricidad", 0))
+        self.costoHoraTrabajo = float(self.infoBase.get("hora_trabajo", 0))
+
+        self.porcentajeGananciaBase: float = float(self.infoBase.get("ganancia", 10))
 
         self.nombreModelo = self.infoCostos.get("nombre")
         self.linkModelo = self.infoCostos.get("link")
@@ -316,6 +322,12 @@ class printtool:
                         ).props("rounded outlined dense")
                         ui.button(on_click=self.actualizarEnsamblado, icon="send")
                         self.textoTiempoEnsamblado.on("keydown.enter", self.actualizarEnsamblado)
+
+                    # if self.urlSpoolman is not None or self.urlSpoolman == "":
+
+                    # self.inputPrecioFilamento = ui.number(label="Precio Filamento", value=)
+
+                    # precioFilamento
 
                     if self.filamentosDisponibles is not None:
                         self.selectorFilamento = ui.select(
@@ -451,8 +463,6 @@ class printtool:
         self.tablaDataExtras.update()
 
     def calculandoPrecioVenta(self):
-
-        self.porcentajeGananciaBase: float = float(self.infoBase.get("ganancia", 10))
 
         self.precioSinIvaReferencia = self.costoUnidad / (1 - self.porcentajeGananciaBase / 100)
         self.gananciaBase = self.precioSinIvaReferencia - self.costoUnidad
@@ -645,10 +655,8 @@ class printtool:
         if self.infoBase is None:
             logger.error("Error fatal con data costos.md")
             exit(1)
-        dataVentas = self.infoCostos
 
-        costoHoraTrabajo = float(self.infoBase.get("hora_trabajo", 0))
-        self.costoEnsamblado = (self.tiempoEnsamblado / 60) * costoHoraTrabajo
+        costoEnsamblado = (self.tiempoEnsamblado / 60) * self.costoHoraTrabajo
 
         if self.filamentoSeleccionado is not None:
             for filamento in self.filamentosDisponibles:
@@ -662,20 +670,20 @@ class printtool:
         self.costoFilamento = self.totalGramos * self.costoGramo
         self.costoEficiencia = self.costoFilamento * float(self.infoBase.get("eficiencia_material")) / 100
 
-        self.costoImpresora: float = float(self.infoBase.get("costo_impresora"))
-        self.envióImpresora: float = float(self.infoBase.get("envio_impresora"))
-        self.mantenimientoImpresora: float = float(self.infoBase.get("mantenimiento_impresora"))
-        self.vidaUtil: float = float(self.infoBase.get("vida_util"))
-        self.tiempoTrabajo: float = (float(self.infoBase.get("tiempo_trabajo")) / 100) * 8760
-        self.consumoPotencia: float = float(self.infoBase.get("consumo"))
-        self.costoElectricidad: float = float(self.infoBase.get("costo_electricidad"))
-        self.errorFabricacion: float = float(self.infoBase.get("error_fabricacion")) / 100
+        self.infoImpresora
 
-        costoTotalImpresora = self.costoImpresora + self.envióImpresora + self.mantenimientoImpresora * self.vidaUtil
+        logger.info(f"info impresora: {self.infoImpresora}")
 
-        costoRecuperacionInversion = costoTotalImpresora / (self.tiempoTrabajo * self.vidaUtil)
-        costoHora = (self.consumoPotencia / 1000) * self.costoElectricidad
-        costoHoraImpresion = (costoRecuperacionInversion + costoHora) * (1 + self.errorFabricacion)
+        costoTotalImpresora = (
+            self.infoImpresora.costo
+            + self.infoImpresora.envio
+            + self.infoImpresora.mantenimiento * self.infoImpresora.vidaUtil
+        )
+
+        tiempoTrabajo = (float(self.infoImpresora.tiempoTrabajo) / 100) * 8760
+        costoRecuperacionInversion = costoTotalImpresora / (tiempoTrabajo * self.infoImpresora.vidaUtil)
+        costoHora = (self.infoImpresora.consumo / 1000) * self.costoElectricidad
+        costoHoraImpresion = (costoRecuperacionInversion + costoHora) * (1 + self.errorFabricacion / 100)
         self.costoHoraImpresion = costoHoraImpresion * self.totalHoras
 
         logger.info(f"costo extras: {self.costoExtras}")
@@ -683,7 +691,7 @@ class printtool:
         logger.info(f"Precio por gramo: {self.costoGramo}")
 
         self.costoTotalImpresion = self.costoFilamento + self.costoEficiencia + self.costoHoraImpresion
-        self.costoUnidad = self.costoTotalImpresion + self.costoExtras + self.costoEnsamblado
+        self.costoUnidad = self.costoTotalImpresion + self.costoExtras + costoEnsamblado
         # TODO: Calcular costo por unidad en base a cuantos modelos hay en cada impresion
         # Considerar agregar en el nombre del archivo la cantidad de modelos
         # ejemplo 5pc
@@ -881,6 +889,16 @@ class printtool:
                 self.infoImpresora.consumo = inputConsumo.value
                 self.infoImpresora.tiempoTrabajo = inputTiempoTrabajo.value
 
+                self.costoHoraTrabajo = inputTrabajo.value
+                self.costoElectricidad = inputKWH.value
+                self.errorFabricacion = inputMerma.value
+
+                self.porcentajeGananciaBase = inputGanancia.value
+
+                if inputFilamento.value is not None and inputFilamento.value != "":
+                    self.precioFilamento = inputFilamento.value
+                    SalvarValor(self.archivoConfig, "costo_filamento", self.precioFilamento)
+
                 SalvarValor(self.archivoConfig, "url_spoolman", self.urlSpoolman)
 
                 SalvarValor(self.archivoConfig, "nombre_impresora", self.infoImpresora.nombre)
@@ -890,6 +908,11 @@ class printtool:
                 SalvarValor(self.archivoConfig, "vida_util_impresora", self.infoImpresora.vidaUtil)
                 SalvarValor(self.archivoConfig, "consumo_impresora", self.infoImpresora.consumo)
                 SalvarValor(self.archivoConfig, "tiempo_trabajo_impresora", self.infoImpresora.tiempoTrabajo)
+
+                SalvarValor(self.archivoConfig, "costo_hora_trabajo", self.costoHoraTrabajo)
+                SalvarValor(self.archivoConfig, "costo_electricidad", self.costoElectricidad)
+                SalvarValor(self.archivoConfig, "error_fabricacion", self.errorFabricacion)
+                SalvarValor(self.archivoConfig, "ganancia", self.porcentajeGananciaBase)
 
             with ui.stepper().props("vertical").classes("w-full") as pasos:
                 pasos.classes("bg-teal-00")
@@ -925,13 +948,13 @@ class printtool:
                         ui.button("Anterior", on_click=pasos.previous).props("flat")
 
                 with ui.step("Ensamblaje"):
-                    inputTrabajo = ui.number(label="Hora trabajo", value=self.infoImpresora.envio)
+                    inputTrabajo = ui.number(label="Hora trabajo", value=self.costoHoraTrabajo)
                     inputTrabajo.props(f"prefix={self.símboloMoneda}")
 
-                    inputKWH = ui.number(label="Costo kWh", value=self.infoImpresora.envio)
+                    inputKWH = ui.number(label="Costo kWh", value=self.costoElectricidad)
                     inputKWH.props(f"prefix={self.símboloMoneda}")
 
-                    inputMerma = ui.number(label="Merma en Fabricación", value=self.infoImpresora.envio)
+                    inputMerma = ui.number(label="Merma en Fabricación", value=self.errorFabricacion)
                     inputMerma.props("prefix=%")
                     with inputMerma:
                         ui.tooltip("")
@@ -953,7 +976,7 @@ class printtool:
                         ui.button("Anterior", on_click=pasos.previous).props("flat")
 
                 with ui.step("Ganancia"):
-                    inputGanancia = ui.number(label="Ganancia", value=self.infoImpresora.envio)
+                    inputGanancia = ui.number(label="Ganancia", value=self.porcentajeGananciaBase)
                     inputGanancia.props("prefix=%")
 
                     with ui.stepper_navigation():
