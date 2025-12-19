@@ -149,8 +149,8 @@ class printtool:
 
         self.infoBase = ObtenerArchivo(self.archivoConfig)
         if self.infoBase is None:
-            logger.error("Error fatal con data/costos.md")
-            exit(1)
+            logger.error("Error falta información para calculo de costos")
+            self.infoBase = dict()
         self.infoCostos = ObtenerArchivo(self.archivoInfo, False)
         self.infoExtras = ObtenerArchivo(self.archivoExtras, False)
 
@@ -160,7 +160,7 @@ class printtool:
     def cargarConfig(self):
 
         self.urlSpoolman = self.infoBase.get("url_spoolman")
-        self.precioFilamento = self.infoBase.get("precio_filamento")
+        self.precioFilamento = self.infoBase.get("precio_filamento", 0)
 
     def configurarData(self) -> None:
         """Configurar la carpeta del proyecto y los archivos de información."""
@@ -187,9 +187,9 @@ class printtool:
         self.infoImpresora.costo = self.infoBase.get("costo_impresora", 0)
         self.infoImpresora.envio = self.infoBase.get("envio_impresora", 0)
         self.infoImpresora.mantenimiento = self.infoBase.get("mantenimiento_impresora", 0)
-        self.infoImpresora.vidaUtil = self.infoBase.get("vida_util_impresora", 0)
+        self.infoImpresora.vidaUtil = self.infoBase.get("vida_util_impresora", 1)
         self.infoImpresora.consumo = self.infoBase.get("consumo_impresora", 0)
-        self.infoImpresora.tiempoTrabajo = self.infoBase.get("tiempo_trabajo_impresora", 0)
+        self.infoImpresora.tiempoTrabajo = self.infoBase.get("tiempo_trabajo_impresora", 50)
 
         self.errorFabricacion = float(self.infoBase.get("error_fabricacion", 0))
         self.costoElectricidad: float = float(self.infoBase.get("costo_electricidad", 0))
@@ -213,20 +213,22 @@ class printtool:
         self.totalGramos = float(self.infoCostos.get("total_gramos", 0))
         self.totalHoras = float(self.infoCostos.get("total_horas", 0))
 
-        self.filamentosDisponibles: list[dict] = self.infoBase.get("filamentos")
+        self.costoFilamento = float(self.infoCostos.get("precio_filamento", 0))
 
-        self.filamentoSeleccionado = int(self.infoCostos.get("filamento_seleccionado", 1))
-        self.listaFilamentos = dict()
-        for filamento in self.filamentosDisponibles:
-            id = filamento.get("id", "")
-            nombre = filamento.get("nombre", "")
-            precio = filamento.get("precio", "")
-            material = filamento.get("material", "")
-            if id is not None:
-                self.listaFilamentos[id] = f"{nombre}-{material} {self.símboloMoneda}{precio:.02f}"
+        # self.filamentosDisponibles: list[dict] = self.infoBase.get("filamentos")
 
-        if self.filamentoSeleccionado not in self.listaFilamentos:
-            self.filamentoSeleccionado = 1
+        # self.filamentoSeleccionado = int(self.infoCostos.get("filamento_seleccionado", 1))
+        # self.listaFilamentos = dict()
+        # for filamento in self.filamentosDisponibles:
+        #     id = filamento.get("id", "")
+        #     nombre = filamento.get("nombre", "")
+        #     precio = filamento.get("precio", "")
+        #     material = filamento.get("material", "")
+        #     if id is not None:
+        #         self.listaFilamentos[id] = f"{nombre}-{material} {self.símboloMoneda}{precio:.02f}"
+
+        # if self.filamentoSeleccionado not in self.listaFilamentos:
+        #     self.filamentoSeleccionado = 1
 
     def cargarGuiInfo(self) -> None:
         """Cargar la interfaz gráfica de usuario para la información básica del modelo."""
@@ -329,13 +331,13 @@ class printtool:
 
                     # precioFilamento
 
-                    if self.filamentosDisponibles is not None:
-                        self.selectorFilamento = ui.select(
-                            self.listaFilamentos,
-                            value=self.filamentoSeleccionado,
-                            label="Material",
-                            on_change=self.seleccionarFilamento,
-                        ).classes("min-w-64")
+                    # if self.filamentosDisponibles is not None:
+                    #     self.selectorFilamento = ui.select(
+                    #         self.listaFilamentos,
+                    #         value=self.filamentoSeleccionado,
+                    #         label="Material",
+                    #         on_change=self.seleccionarFilamento,
+                    #     ).classes("min-w-64")
 
                 infoArchivo = [
                     {
@@ -630,6 +632,7 @@ class printtool:
                 infoGcode.tiempo = hours + minutes / 60 + seconds / 3600
 
             if infoGcode.tiempo == 0:
+                # TODO: Buscar dias
                 buscarTiempo = re.search(r"(\d+)h", nombre)
                 if buscarTiempo:
                     infoGcode.tiempo = float(buscarTiempo.group(1))
@@ -658,6 +661,10 @@ class printtool:
 
         costoEnsamblado = (self.tiempoEnsamblado / 60) * self.costoHoraTrabajo
 
+        # precioFilamento = self.precioFilamento
+
+        self.filamentoSeleccionado = None
+
         if self.filamentoSeleccionado is not None:
             for filamento in self.filamentosDisponibles:
                 id_filamento = filamento.get("id", "")
@@ -665,10 +672,10 @@ class printtool:
                     precioFilamento = filamento.get("precio", 0)
                     self.costoGramo = precioFilamento / 1000
         else:
-            self.costoGramo = float(self.infoBase.get("precio_filamento", 0)) / 1000
+            self.costoGramo = float(self.precioFilamento) / 1000
 
         self.costoFilamento = self.totalGramos * self.costoGramo
-        self.costoEficiencia = self.costoFilamento * float(self.infoBase.get("eficiencia_material")) / 100
+        self.costoEficiencia = self.costoFilamento * float(self.errorFabricacion) / 100
 
         self.infoImpresora
 
