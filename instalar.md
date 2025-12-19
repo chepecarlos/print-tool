@@ -22,8 +22,14 @@ git submodule init
 git submodule update
 ```
 
+## dependencias
+
+```bash
+sudo apt install python3-tk
+``` 
+
 ## instalar de paquetes
 
 ```bash
-pipx install .
+pipx install . --force
 ``` 
