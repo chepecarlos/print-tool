@@ -17,6 +17,8 @@ class dataGcode:
     "Color del material"
     cantidad: int = 1
     "Cantidad de veces que se repiten las piezas en el modelo"
+    copias: int = 1
+    "Cantidad de copias a imprimir"
     materialPorPieza: float = 0.0
     "Cantidad de material por pieza en gramos"
     tiempoPorPieza: float = 0.0

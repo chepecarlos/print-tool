@@ -341,6 +341,12 @@ class printtool:
 
                 infoArchivo = [
                     {
+                        "name": "copias",
+                        "label": "Copias",
+                        "field": "copias",
+                        "sortable": False,
+                    },
+                    {
                         "name": "nombre",
                         "label": "Modelos",
                         "field": "nombre",
@@ -522,6 +528,7 @@ class printtool:
                 tiempo_formateado = f"{horas}h {minutos}m"
                 dataArchivo.append(
                     {
+                        "copias": infoGcode.copias,
                         "nombre": nombreArchivo,
                         "archivo": archivo,
                         "material": f"{material:.2f}g",
@@ -529,8 +536,8 @@ class printtool:
                         "cantidad": infoGcode.cantidad,
                     }
                 )
-                self.totalGramos += material
-                self.totalHoras += tiempo
+                self.totalGramos += material * infoGcode.copias
+                self.totalHoras += tiempo * infoGcode.copias
 
         minutosTotal = int((self.totalHoras - int(self.totalHoras)) * 60)
 
@@ -650,7 +657,33 @@ class printtool:
                 infoGcode.materialPorPieza = infoGcode.material / infoGcode.cantidad
                 infoGcode.tiempoPorPieza = infoGcode.tiempo / infoGcode.cantidad
 
+            buscarCopias = re.search(r"(\d+)cc", nombre)
+            if buscarCopias:
+                infoGcode.copias = int(buscarCopias.group(1))
+
             return infoGcode
+
+    def calculoHoraImpresion(self) -> float:
+        """Calcular el costo por hora de impresión.
+        En base a los costos de la impresora, consumo eléctrico y eficiencia.
+
+        Returns:
+            float: Costo por hora de impresión
+        """
+
+        costoTotalImpresora = (
+            self.infoImpresora.costo
+            + self.infoImpresora.envio
+            + self.infoImpresora.mantenimiento * self.infoImpresora.vidaUtil
+        )
+
+        tiempoTrabajoHorasPorAño = (float(self.infoImpresora.tiempoTrabajo) / 100) * 365 * 24
+
+        costoRecuperacionInversion = costoTotalImpresora / (tiempoTrabajoHorasPorAño * self.infoImpresora.vidaUtil)
+        costoElectricidadHora = (self.infoImpresora.consumo / 1000) * self.costoElectricidad
+
+        costoHoraImpresion = (costoRecuperacionInversion + costoElectricidadHora) * (1 + self.errorFabricacion / 100)
+        return costoHoraImpresion
 
     def calcularCostos(self):
         """Calcular costos"""
@@ -674,23 +707,11 @@ class printtool:
         else:
             self.costoGramo = float(self.precioFilamento) / 1000
 
+        costoHoraImpresion = self.calculoHoraImpresion()
+
         self.costoFilamento = self.totalGramos * self.costoGramo
         self.costoEficiencia = self.costoFilamento * float(self.errorFabricacion) / 100
 
-        self.infoImpresora
-
-        logger.info(f"info impresora: {self.infoImpresora}")
-
-        costoTotalImpresora = (
-            self.infoImpresora.costo
-            + self.infoImpresora.envio
-            + self.infoImpresora.mantenimiento * self.infoImpresora.vidaUtil
-        )
-
-        tiempoTrabajo = (float(self.infoImpresora.tiempoTrabajo) / 100) * 8760
-        costoRecuperacionInversion = costoTotalImpresora / (tiempoTrabajo * self.infoImpresora.vidaUtil)
-        costoHora = (self.infoImpresora.consumo / 1000) * self.costoElectricidad
-        costoHoraImpresion = (costoRecuperacionInversion + costoHora) * (1 + self.errorFabricacion / 100)
         self.costoHoraImpresion = costoHoraImpresion * self.totalHoras
 
         logger.info(f"costo extras: {self.costoExtras}")
