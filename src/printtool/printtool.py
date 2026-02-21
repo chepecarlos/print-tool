@@ -53,6 +53,7 @@ class printtool:
     precioVentaReferencia: float = 0
     precioVentaFinal: float = 0
     precioFilamento: float = 0
+    costoGramo: float = 0
 
     totalHoras: float = 0
     "Total de horas de la impresión"
@@ -351,6 +352,7 @@ class printtool:
                         "label": "Modelos",
                         "field": "nombre",
                         "required": True,
+                        "sortable": True,
                         "align": "left",
                     },
                     # {'name': 'archivo', 'label': 'Archivo', 'field': 'archivo'},
@@ -359,6 +361,12 @@ class printtool:
                         "label": "Cantidad",
                         "field": "cantidad",
                         "sortable": False,
+                    },
+                    {
+                        "name": "costo",
+                        "label": "Costo",
+                        "field": "costo",
+                        "sortable": True,
                     },
                     {
                         "name": "material",
@@ -499,6 +507,8 @@ class printtool:
 
         logger.info(f"Buscando en {self.folderProyecto}")
         sufijoArchivo = (".bgcode", ".gcode")
+        costoHoraImpresion = self.calculoHoraImpresion()
+        self.cargarCostoPorGramo()
         for archivo in os.listdir(self.folderProyecto):
             if archivo.endswith(sufijoArchivo):
                 logger.info(f"Archivo encontrado: {archivo}")
@@ -514,30 +524,34 @@ class printtool:
                     ui.notify(f"No se pudo obtener información de {archivo}, saltando...")
                     continue
 
-                tiempo = infoGcode.tiempo
-                material = infoGcode.material
+                tiempoPorUnidad = infoGcode.tiempo
+                materialPorUnidad = infoGcode.material
 
                 if infoGcode.cantidad > 1:
                     logger.info(f"Archivo {archivo} tiene {infoGcode.cantidad} piezas.")
-                    tiempo = tiempo / infoGcode.cantidad
-                    material = material / infoGcode.cantidad
-                    logger.info(f"Por pieza: {tiempo:.2f} horas, {material:.2f} gramos.")
+                    tiempoPorUnidad = tiempoPorUnidad / infoGcode.cantidad
+                    materialPorUnidad = materialPorUnidad / infoGcode.cantidad
+                    logger.info(f"Por pieza: {tiempoPorUnidad:.2f} horas, {materialPorUnidad:.2f} gramos.")
 
-                horas = int(tiempo)
-                minutos = int((tiempo - horas) * 60)
+                horas = int(tiempoPorUnidad)
+                minutos = int((tiempoPorUnidad - horas) * 60)
                 tiempo_formateado = f"{horas}h {minutos}m"
+                infoGcode.costo = (materialPorUnidad * self.costoGramo + tiempoPorUnidad * costoHoraImpresion) * (
+                    1 + float(self.errorFabricacion) / 100
+                )
                 dataArchivo.append(
                     {
                         "copias": infoGcode.copias,
                         "nombre": nombreArchivo,
                         "archivo": archivo,
-                        "material": f"{material:.2f}g",
+                        "material": f"{materialPorUnidad:.2f}g",
                         "tiempo": f"{tiempo_formateado}",
                         "cantidad": infoGcode.cantidad,
+                        "costo": f"$ {infoGcode.costo:.2f}",
                     }
                 )
-                self.totalGramos += material * infoGcode.copias
-                self.totalHoras += tiempo * infoGcode.copias
+                self.totalGramos += materialPorUnidad * infoGcode.copias
+                self.totalHoras += tiempoPorUnidad * infoGcode.copias
 
         minutosTotal = int((self.totalHoras - int(self.totalHoras)) * 60)
 
@@ -590,9 +604,9 @@ class printtool:
             else:
                 lineasDocumento = data
 
-            buscarImpresora = re.search(r"printer_model=.*(MMU3)", lineasDocumento)
+            buscarImpresoraMultiMaterial = re.search(r";\s*printer_model\s*=\s*.*?(MMU\d+)", lineasDocumento)
 
-            if buscarImpresora:
+            if buscarImpresoraMultiMaterial:
                 self.multiMaterial = True
             else:
                 self.multiMaterial = False
@@ -661,6 +675,10 @@ class printtool:
             if buscarCopias:
                 infoGcode.copias = int(buscarCopias.group(1))
 
+            print(
+                f"Archivo: {archivo}, Material: {infoGcode.material}g, Tiempo: {infoGcode.tiempo}h, Cantidad: {infoGcode.cantidad}, Copias: {infoGcode.copias}"
+            )
+
             return infoGcode
 
     def calculoHoraImpresion(self) -> float:
@@ -685,17 +703,10 @@ class printtool:
         costoHoraImpresion = (costoRecuperacionInversion + costoElectricidadHora) * (1 + self.errorFabricacion / 100)
         return costoHoraImpresion
 
-    def calcularCostos(self):
-        """Calcular costos"""
+    def cargarCostoPorGramo(self):
+        """Cargar el costo por gramo del filamento seleccionado"""
 
-        if self.infoBase is None:
-            logger.error("Error fatal con data costos.md")
-            exit(1)
-
-        costoEnsamblado = (self.tiempoEnsamblado / 60) * self.costoHoraTrabajo
-
-        # precioFilamento = self.precioFilamento
-
+        self.costoGramo = 0
         self.filamentoSeleccionado = None
 
         if self.filamentoSeleccionado is not None:
@@ -706,6 +717,18 @@ class printtool:
                     self.costoGramo = precioFilamento / 1000
         else:
             self.costoGramo = float(self.precioFilamento) / 1000
+
+    def calcularCostos(self):
+        """Calcular costos"""
+
+        if self.infoBase is None:
+            logger.error("Error fatal con data costos.md")
+            exit(1)
+
+        costoEnsamblado = (self.tiempoEnsamblado / 60) * self.costoHoraTrabajo
+
+        # precioFilamento = self.precioFilamento
+        self.cargarCostoPorGramo()
 
         costoHoraImpresion = self.calculoHoraImpresion()
 
