@@ -725,7 +725,7 @@ class printtool:
             logger.error("Error fatal con data costos.md")
             exit(1)
 
-        costoEnsamblado = (self.tiempoEnsamblado / 60) * self.costoHoraTrabajo
+        self.costoEnsamblado = (self.tiempoEnsamblado / 60) * self.costoHoraTrabajo
 
         # precioFilamento = self.precioFilamento
         self.cargarCostoPorGramo()
@@ -742,7 +742,7 @@ class printtool:
         logger.info(f"Precio por gramo: {self.costoGramo}")
 
         self.costoTotalImpresion = self.costoFilamento + self.costoEficiencia + self.costoHoraImpresion
-        self.costoUnidad = self.costoTotalImpresion + self.costoExtras + costoEnsamblado
+        self.costoUnidad = self.costoTotalImpresion + self.costoExtras + self.costoEnsamblado
         # TODO: Calcular costo por unidad en base a cuantos modelos hay en cada impresion
         # Considerar agregar en el nombre del archivo la cantidad de modelos
         # ejemplo 5pc
