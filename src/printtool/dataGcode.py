@@ -23,3 +23,5 @@ class dataGcode:
     "Cantidad de material por pieza en gramos"
     tiempoPorPieza: float = 0.0
     "Tiempo de impresión por pieza en horas"
+    costo: float = 0.0
+    "Costo calculado de la impresión"
