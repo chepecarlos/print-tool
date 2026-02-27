@@ -53,6 +53,7 @@ class printtool:
     precioVentaReferencia: float = 0
     precioVentaFinal: float = 0
     precioFilamento: float = 0
+    "Costo por kilogramos del filamento seleccionado"
     costoGramo: float = 0
 
     totalHoras: float = 0
@@ -267,7 +268,8 @@ class printtool:
             area.classes("w-full h-100 border border-2 border-teal-600h")
             area.style("height: 75vh")
 
-            dataCostos = [
+            # separar datos generales de los costos monetarios
+            dataTotales = [
                 {"key": "totalGramos", "humano": "Filamento por Unidad", "formato": lambda x: f"{x:.2f}g"},
                 {
                     "key": "totalHoras",
@@ -279,6 +281,9 @@ class printtool:
                     "humano": "Tiempo Ensamblaje",
                     "formato": lambda x: f"{int(x/60)}h {int(x - int(x/60)*60)}m",
                 },
+            ]
+
+            dataCostos = [
                 {
                     "key": "costoFilamento",
                     "humano": "Costo de Filamento",
@@ -304,20 +309,38 @@ class printtool:
             ]
 
             with ui.column().classes("w-full justify-center items-center"):
-                ui.button("Recargar Costos", on_click=self.cargarCostos).classes("w-64")
+                with ui.button("Recargar Costos", on_click=self.cargarCostos).classes("w-64"):
+                    ui.tooltip(
+                        "Al hacer click se recargan los costos de impresión, ensamblado y extras. Útil para actualizar después de hacer cambios en los archivos o en la configuración."
+                    )
 
             with ui.column().bind_visibility_from(self, "mostrarCostos") as panelCostos:
                 panelCostos.classes("w-full justify-center items-center")
-                with ui.column().classes("w-full justify-center items-center"):
-                    ui.label("Costos por Unidad").classes("justify-center items-center")
-                    with ui.grid(columns=2).classes("justify-center items-center"):
-                        for item in dataCostos:
-                            ui.label(item["humano"])
-                            ui.label().bind_text_from(
-                                self,
-                                item["key"],
-                                lambda x, transform_func=item["formato"]: transform_func(x),
-                            )
+
+                # mostrar ambas tablas en columnas separadas
+                with ui.row().classes("w-full justify-around items-start"):
+                    # izquierda: totales de fabricación
+                    with ui.column().classes("justify-center items-center"):
+                        ui.label("Datos de fabricación").classes("font-bold text-center")
+                        with ui.grid(columns=2).classes("justify-center items-center"):
+                            for item in dataTotales:
+                                ui.label(item["humano"]).classes("text-right pr-4")
+                                ui.label().bind_text_from(
+                                    self,
+                                    item["key"],
+                                    lambda x, transform_func=item["formato"]: transform_func(x),
+                                ).classes("text-left")
+                    # derecha: costos monetarios
+                    with ui.column().classes("justify-center items-center"):
+                        ui.label("Costos por Unidad").classes("font-bold text-center")
+                        with ui.grid(columns=2).classes("justify-center items-center"):
+                            for item in dataCostos:
+                                ui.label(item["humano"]).classes("text-right pr-4")
+                                ui.label().bind_text_from(
+                                    self,
+                                    item["key"],
+                                    lambda x, transform_func=item["formato"]: transform_func(x),
+                                ).classes("text-left")
 
                 with ui.row().classes("w-full justify-center items-center"):
                     with ui.column().classes("justify-center items-center"):
