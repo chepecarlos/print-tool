@@ -37,6 +37,7 @@ https://pywebview.flowrl.com/guide/installation.html
 - Piezas: {n}pc
 - Tiempo: {n}h{n}m
 - Gramos: {n}g
+- Copias: {n}cc
 
 Ejemplo: modelo_32g_5pc_2h10m.gcode
 - 32 Gramos

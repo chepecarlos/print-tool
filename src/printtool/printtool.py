@@ -24,7 +24,7 @@ logger = ConfigurarLogging(__name__)
 
 
 class printtool:
-    """Clase principal para la herramienta de emprendimiento de impresión 3D."""
+    """Clase principal para la herramienta de emprendimiento de impresión 3D"""
 
     totalGramos: float = 0
     "Total de gramos de la impresión"
@@ -84,6 +84,8 @@ class printtool:
     folderProyecto: str = None
     "Folder del proyecto"
 
+    mostrarCostos: bool = False
+    "Bandera que controla si la sección de costos se muestra"
     archivoInfo: str = None
     "Archivo de información del modelo "
     archivoExtras: str = None
@@ -303,28 +305,30 @@ class printtool:
 
             with ui.column().classes("w-full justify-center items-center"):
                 ui.button("Recargar Costos", on_click=self.cargarCostos).classes("w-64")
-                ui.label("Costos por Unidad").classes("justify-center items-center")
-                with ui.grid(columns=2).classes("justify-center items-center"):
 
-                    for item in dataCostos:
-                        ui.label(item["humano"])
-                        ui.label().bind_text_from(
-                            self,
-                            item["key"],
-                            lambda x, transform_func=item["formato"]: transform_func(x),
-                        )
+            with ui.column().bind_visibility_from(self, "mostrarCostos") as panelCostos:
+                panelCostos.classes("w-full justify-center items-center")
+                with ui.column().classes("w-full justify-center items-center"):
+                    ui.label("Costos por Unidad").classes("justify-center items-center")
+                    with ui.grid(columns=2).classes("justify-center items-center"):
+                        for item in dataCostos:
+                            ui.label(item["humano"])
+                            ui.label().bind_text_from(
+                                self,
+                                item["key"],
+                                lambda x, transform_func=item["formato"]: transform_func(x),
+                            )
 
-            with ui.row().classes("w-full justify-center items-center"):
-                with ui.column().classes("justify-center items-center"):
-
-                    with ui.row().props("rounded outlined dense"):
-                        self.textoTiempoEnsamblado = ui.input(
-                            label="Tiempo Ensamblado (Minutos)",
-                            value=self.tiempoEnsamblado,
-                            validation=self.validar_numero,
-                        ).props("rounded outlined dense")
-                        ui.button(on_click=self.actualizarEnsamblado, icon="send")
-                        self.textoTiempoEnsamblado.on("keydown.enter", self.actualizarEnsamblado)
+                with ui.row().classes("w-full justify-center items-center"):
+                    with ui.column().classes("justify-center items-center"):
+                        with ui.row().props("rounded outlined dense"):
+                            self.textoTiempoEnsamblado = ui.input(
+                                label="Tiempo Ensamblado (Minutos)",
+                                value=self.tiempoEnsamblado,
+                                validation=self.validar_numero,
+                            ).props("rounded outlined dense")
+                            ui.button(on_click=self.actualizarEnsamblado, icon="send")
+                            self.textoTiempoEnsamblado.on("keydown.enter", self.actualizarEnsamblado)
 
                     # if self.urlSpoolman is not None or self.urlSpoolman == "":
 
@@ -433,7 +437,9 @@ class printtool:
         ui.notify(f"Tiempo de ensamblado actualizado a {self.tiempoEnsamblado} minutos")
 
     def cargarCostos(self):
-        # ui.notify("Cargando Costos...")
+        """Cargar y calcular los costos de impresión, ensamblado y extras."""
+        # cuando se presiona el botón mostramos la información
+        self.mostrarCostos = True
         self.cargarDataArchivos()
         self.costosExtras()
         self.calcularCostos()
