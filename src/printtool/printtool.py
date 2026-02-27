@@ -334,13 +334,16 @@ class printtool:
                     with ui.column().classes("justify-center items-center"):
                         ui.label("Costos por Unidad").classes("font-bold text-center")
                         with ui.grid(columns=2).classes("justify-center items-center"):
-                            for item in dataCostos:
-                                ui.label(item["humano"]).classes("text-right pr-4")
+                            for idx, item in enumerate(dataCostos):
+                                is_total = (idx == len(dataCostos) - 1)  # es el último elemento (Costo Total)
+                                if is_total:
+                                    ui.separator().classes("col-span-2 my-2")
+                                ui.label(item["humano"]).classes("text-right pr-4" + (" font-bold text-lg" if is_total else ""))
                                 ui.label().bind_text_from(
                                     self,
                                     item["key"],
                                     lambda x, transform_func=item["formato"]: transform_func(x),
-                                ).classes("text-left")
+                                ).classes("text-left" + (" font-bold text-lg text-yellow-400" if is_total else ""))
 
                 with ui.row().classes("w-full justify-center items-center"):
                     with ui.column().classes("justify-center items-center"):
