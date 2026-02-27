@@ -4,10 +4,20 @@ DOCS_DIR = docs
 # Paquete o ruta del código a documentar
 PACKAGE = src/printtool
 
+# listado de dependencias para apt (igual que en instalar.md)
+APTPKGS = python3-dev libcairo2-dev libgirepository1.0-dev pkg-config python3-tk
+
 
 install:
 	@echo "Instalando Paquete..."
 	pipx install . --force
+
+# preparar el entorno de sistema (paquetes apt necesarios)
+dependencias:
+	@echo "Instalando dependencias de sistema..."
+	sudo apt update && \
+	sudo apt install -y python3-dev libcairo2-dev libgirepository1.0-dev pkg-config python3-tk
+
 
 # Generar documentación
 docs:
