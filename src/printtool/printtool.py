@@ -38,6 +38,7 @@ class printtool:
     "Costo por ensamblado"
     costoUnidad: float = 0
     "Costos por unidad"
+    porcentajeInpuesto: float = 13
 
     porcentajeGananciaBase: float = 0
     "Porcentaje Ganancia de Referencia"
@@ -335,10 +336,12 @@ class printtool:
                         ui.label("Costos por Unidad").classes("font-bold text-center")
                         with ui.grid(columns=2).classes("justify-center items-center"):
                             for idx, item in enumerate(dataCostos):
-                                is_total = (idx == len(dataCostos) - 1)  # es el último elemento (Costo Total)
+                                is_total = idx == len(dataCostos) - 1  # es el último elemento (Costo Total)
                                 if is_total:
                                     ui.separator().classes("col-span-2 my-2")
-                                ui.label(item["humano"]).classes("text-right pr-4" + (" font-bold text-lg" if is_total else ""))
+                                ui.label(item["humano"]).classes(
+                                    "text-right pr-4" + (" font-bold text-lg" if is_total else "")
+                                )
                                 ui.label().bind_text_from(
                                     self,
                                     item["key"],
@@ -514,14 +517,14 @@ class printtool:
 
         self.precioSinIvaReferencia = self.costoUnidad / (1 - self.porcentajeGananciaBase / 100)
         self.gananciaBase = self.precioSinIvaReferencia - self.costoUnidad
-        self.ivaReferencia = self.precioSinIvaReferencia * 0.13
+        self.ivaReferencia = self.precioSinIvaReferencia * self.porcentajeInpuesto / 100
         self.precioVentaReferencia = self.precioSinIvaReferencia + self.ivaReferencia
 
         if self.precioVentaFinal is None:
             self.precioVentaFinal = self.precioVentaReferencia
 
         if self.precioVentaFinal >= 0:
-            self.precioSinIvaFinal = self.precioVentaFinal / 1.13
+            self.precioSinIvaFinal = self.precioVentaFinal / (1 + self.porcentajeInpuesto / 100)
             self.ivaFinal = self.precioVentaFinal - self.precioSinIvaFinal
             self.gananciaFinal = self.precioSinIvaFinal - self.costoUnidad
             if self.gananciaFinal < 0 or self.precioSinIvaFinal == 0:
@@ -643,8 +646,6 @@ class printtool:
             else:
                 self.multiMaterial = False
 
-            logger.info(f"MultiMaterial de impresora: {self.multiMaterial}")
-
             if self.multiMaterial:
                 # Formato de la línea: printer_model=MMU3
                 # filament used [g]=81.79, 17.95, 41.29, 0.00, 0.00
@@ -671,8 +672,6 @@ class printtool:
                 if buscarGramos:
                     infoGcode.material = float(buscarGramos.group(1))
 
-            logger.info(f"Gramos : {infoGcode.material}")
-
             time_match = re.search(
                 r"estimated printing time \(normal mode\)\s?=\s?(([0-9]+)h )?([0-9]+)m ([0-9]+)s",
                 lineasDocumento,
@@ -693,8 +692,6 @@ class printtool:
                 if buscarTiempo:
                     infoGcode.tiempo += float(buscarTiempo.group(1)) / 60
 
-            logger.info(f"Tiempo(Horas) : {infoGcode.tiempo}")
-
             buscarPiezas = re.search(r"(\d+)pc", nombre)
 
             if buscarPiezas:
@@ -707,8 +704,10 @@ class printtool:
             if buscarCopias:
                 infoGcode.copias = int(buscarCopias.group(1))
 
-            print(
-                f"Archivo: {archivo}, Material: {infoGcode.material}g, Tiempo: {infoGcode.tiempo}h, Cantidad: {infoGcode.cantidad}, Copias: {infoGcode.copias}"
+            horas, minutos = int(infoGcode.tiempo), int((infoGcode.tiempo - int(infoGcode.tiempo)) * 60)
+
+            logger.info(
+                f"Archivo: {nombre}, Material: {infoGcode.material}g, Tiempo: {horas}h {minutos}m, Cantidad: {infoGcode.cantidad}, Copias: {infoGcode.copias}"
             )
 
             return infoGcode
@@ -732,7 +731,8 @@ class printtool:
         costoRecuperacionInversion = costoTotalImpresora / (tiempoTrabajoHorasPorAño * self.infoImpresora.vidaUtil)
         costoElectricidadHora = (self.infoImpresora.consumo / 1000) * self.costoElectricidad
 
-        costoHoraImpresion = (costoRecuperacionInversion + costoElectricidadHora) * (1 + self.errorFabricacion / 100)
+        costoHoraImpresion = costoRecuperacionInversion + costoElectricidadHora
+        logger.info(f"Costo por hora de impresión: {self.símboloMoneda}{costoHoraImpresion:.2f}")
         return costoHoraImpresion
 
     def cargarCostoPorGramo(self):
@@ -748,6 +748,7 @@ class printtool:
                     precioFilamento = filamento.get("precio", 0)
                     self.costoGramo = precioFilamento / 1000
         else:
+            logger.info(f"Costo Kilogramo de Filamento: {self.precioFilamento}")
             self.costoGramo = float(self.precioFilamento) / 1000
 
     def calcularCostos(self):
@@ -846,30 +847,50 @@ class printtool:
         ]
 
         with ui.column().classes("w-full justify-center items-center"):
-            with ui.grid(columns=3).classes("justify-center items-center"):
-                ui.label()
-                ui.label("Referencia")
-                ui.label("Final")
-                for item in dataPrecio:
-                    ui.label(item["humano"])
+            with ui.grid(columns=3).classes("justify-center items-center w-full max-w-2xl gap-4"):
+                # encabezados
+                ui.label("Calculo").classes("font-bold text-center")
+                ui.label("Referencia").classes("font-bold text-center")
+                ui.label("Final").classes("font-bold text-center")
+
+                # filas de datos
+                for idPrecio, precioActual in enumerate(dataPrecio):
+                    esUltimo = idPrecio == len(dataPrecio) - 1  # último elemento
+
+                    if esUltimo:
+                        # separador antes del total
+                        ui.separator().classes("col-span-3 my-2")
+
+                    # nombre
+                    ui.label(precioActual["humano"]).classes("text-left" + (" font-bold text-lg" if esUltimo else ""))
+                    # referencia
                     ui.label().bind_text_from(
                         self,
-                        item["referencia"],
-                        lambda x, transform_func=item["formato"]: transform_func(x),
-                    )
+                        precioActual["referencia"],
+                        lambda x, transform_func=precioActual["formato"]: transform_func(x),
+                    ).classes("text-center" + (" font-bold text-lg" if esUltimo else ""))
+                    # final
                     ui.label().bind_text_from(
                         self,
-                        item["final"],
-                        lambda x, transform_func=item["formato"]: transform_func(x),
-                    )
-            with ui.row().props("rounded outlined dense"):
-                self.textoVenta = ui.input(
-                    label="Precio de Venta",
-                    value=self.precioVentaFinal,
-                    validation=self.validar_numero,
-                ).props("rounded outlined dense")
-                ui.button(on_click=self.actualizarPrecios, icon="send")
-                self.textoVenta.on("keydown.enter", self.actualizarPrecios)
+                        precioActual["final"],
+                        lambda x, transform_func=precioActual["formato"]: transform_func(x),
+                    ).classes("text-center" + (" font-bold text-lg text-green-400" if esUltimo else ""))
+
+            # control para actualizar precio de venta
+            ui.separator().classes("my-4 w-full")
+            with ui.row().classes("w-full justify-center"):
+                with ui.column().classes("justify-center items-center gap-2"):
+                    ui.label("Actualizar Precio de Venta").classes("font-bold")
+                    with ui.row().props("rounded outlined").classes("items-center gap-2"):
+                        self.textoVenta = ui.input(
+                            label="Nuevo Precio",
+                            value=self.precioVentaFinal,
+                            validation=self.validar_numero,
+                        ).classes("min-w-48")
+                        ui.button(on_click=self.actualizarPrecios, icon="check").props("color=positive").classes(
+                            "h-full"
+                        )
+                        self.textoVenta.on("keydown.enter", self.actualizarPrecios)
 
     def actualizarPrecios(self):
         self.precioVentaFinal = float(self.textoVenta.value)
