@@ -19,6 +19,7 @@ from printtool.MiLibrerias import (
 
 from printtool.extrasGui import seleccionarFolderThinter
 from printtool.paginaConfig import registraPaginaConfig
+from printtool.paginaActualizar import cargarPaginaActualizar
 
 
 logger = ConfigurarLogging(__name__)
@@ -972,32 +973,7 @@ class printtool:
 
     def cargarGuiActualizar(self):
         "Crear interface para actualizar datos del modelo"
-
-        with ui.column().classes("w-full items-center"):
-            ui.label("Editar información").classes("text-h5 font-bold text-center w-full q-mb-sm")
-            ui.separator().classes("w-64 q-mb-md")
-
-            ui.label(f"Proyecto: {self.folderProyecto}").classes("text-white w-64 text-center break-words")
-
-        self.textoNombre = ui.input(label="Nombre", value=self.nombreModelo, validation=self.validar_texto_requerido)
-        self.textoNombre.classes("w-64")
-        self.textoNombre.on("keydown.enter", self.guardarModelo)
-
-        self.textoPropiedad = ui.input(label="Propiedad", value=self.propiedadModelo).classes("w-64")
-        self.tipoImpresion = ui.select(self.tipoProductos, label="tipo", value=self.tipoModelo).classes("w-64")
-        self.textoInventario = ui.number(
-            label="Inventario", value=self.inventario, validation=self.validar_entero_no_negativo, step=1
-        ).classes("w-64")
-
-        self.textoSKU = ui.input(label="SKU", value=self.skuModelo).classes("w-64")
-
-        self.textoDescripción = (
-            ui.textarea(label="Descripción", value=self.descripciónModelo).props("clearable").classes("w-64")
-        )
-
-        self.textoLink = ui.input(value=self.linkModelo, label="Link").classes("w-64")
-
-        ui.button("Guardar", on_click=self.guardarModelo).classes("w-64")
+        cargarPaginaActualizar(self)
 
     async def buscarFolder(self) -> None:
         ui.notify("Abriendo selector...", type="info")
@@ -1009,39 +985,6 @@ class printtool:
             ui.notify(f"Carpeta: {folderBuscado}", type="positive")
         else:
             ui.notify("Cancelado", type="warning")
-
-    def guardarModelo(self) -> None:
-        "Guardar información del modelo en el archivo info.md"
-
-        # Obtener valores de los campos
-        nombre = self.textoNombre.value if self.textoNombre.value is not None else ""
-        inventario = self.parse_int_seguro(self.textoInventario.value)
-
-        if str(nombre).strip() == "":
-            ui.notify("El nombre del modelo es obligatorio", type="negative")
-            return
-
-        if inventario is None or inventario < 0:
-            ui.notify("El inventario debe ser un entero >= 0", type="negative")
-            return
-
-        self.nombreModelo = nombre
-        self.inventario = inventario
-        self.linkModelo = self.textoLink.value
-        self.skuModelo = self.textoSKU.value
-        self.propiedadModelo = self.textoPropiedad.value
-        self.tipoModelo = self.tipoImpresion.value
-        self.descripciónModelo = self.textoDescripción.value
-
-        SalvarValor(self.archivoInfo, "nombre", self.nombreModelo, local=False)
-        SalvarValor(self.archivoInfo, "link", self.linkModelo, local=False)
-        SalvarValor(self.archivoInfo, "tipo", self.tipoModelo, local=False)
-        SalvarValor(self.archivoInfo, "inventario", self.inventario, local=False)
-        SalvarValor(self.archivoInfo, "propiedad", self.propiedadModelo, local=False)
-        SalvarValor(self.archivoInfo, "descripción", self.descripciónModelo, local=False)
-        SalvarValor(self.archivoInfo, "sku", self.skuModelo, local=False)
-
-        ui.notify("Salvando Información")
 
     def cargarGui(self, interface: bool = False) -> None:
         """Cargar la interfaz gráfica de usuario.
