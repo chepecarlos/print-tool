@@ -18,6 +18,7 @@ from printtool.MiLibrerias import (
 )
 
 from printtool.extrasGui import seleccionarFolderThinter
+from printtool.paginaConfig import registraPaginaConfig
 
 
 logger = ConfigurarLogging(__name__)
@@ -1043,149 +1044,6 @@ class printtool:
             interface (bool): Indica si se debe mostrar la interfaz completa con cabecera y pie de página.
         """
 
-        @ui.page("/config")
-        def paginaConfigurar():
-
-            def salvarSímbolo() -> None:
-                if inputSímbolo.value != "" and inputSímbolo.value != self.símboloMoneda:
-                    self.símboloMoneda = inputSímbolo.value
-                    ui.notify("Actualizando Símbolo {self.símboloMoneda}")
-                    inputCostoImpresora.props(f"prefix={self.símboloMoneda}")
-                    inputEnvioImpresora.props(f"prefix={self.símboloMoneda}")
-
-                pasos.next()
-
-            def salvarConfiguration() -> None:
-                ui.notify("Se actualizo las configuraciones")
-
-                self.urlSpoolman = inputSpoolman.value
-
-                self.infoImpresora.nombre = inputNombre.value
-                self.infoImpresora.costo = inputCostoImpresora.value
-                self.infoImpresora.envio = inputEnvioImpresora.value
-                self.infoImpresora.mantenimiento = inputMantenimiento.value
-                self.infoImpresora.vidaUtil = inputVidaUtil.value
-                self.infoImpresora.consumo = inputConsumo.value
-                self.infoImpresora.tiempoTrabajo = inputTiempoTrabajo.value
-
-                self.costoHoraTrabajo = inputTrabajo.value
-                self.costoElectricidad = inputKWH.value
-                self.errorFabricacion = inputMerma.value
-
-                self.porcentajeGananciaBase = inputGanancia.value
-
-                if inputFilamento.value is not None and inputFilamento.value != "":
-                    self.precioFilamento = inputFilamento.value
-                    SalvarValor(self.archivoConfig, "costo_filamento", self.precioFilamento)
-
-                SalvarValor(self.archivoConfig, "url_spoolman", self.urlSpoolman)
-
-                SalvarValor(self.archivoConfig, "nombre_impresora", self.infoImpresora.nombre)
-                SalvarValor(self.archivoConfig, "costo_impresora", self.infoImpresora.costo)
-                SalvarValor(self.archivoConfig, "envio_impresora", self.infoImpresora.envio)
-                SalvarValor(self.archivoConfig, "mantenimiento_impresora", self.infoImpresora.mantenimiento)
-                SalvarValor(self.archivoConfig, "vida_util_impresora", self.infoImpresora.vidaUtil)
-                SalvarValor(self.archivoConfig, "consumo_impresora", self.infoImpresora.consumo)
-                SalvarValor(self.archivoConfig, "tiempo_trabajo_impresora", self.infoImpresora.tiempoTrabajo)
-
-                SalvarValor(self.archivoConfig, "costo_hora_trabajo", self.costoHoraTrabajo)
-                SalvarValor(self.archivoConfig, "costo_electricidad", self.costoElectricidad)
-                SalvarValor(self.archivoConfig, "error_fabricacion", self.errorFabricacion)
-                SalvarValor(self.archivoConfig, "ganancia", self.porcentajeGananciaBase)
-
-            with ui.stepper().props("vertical").classes("w-full") as pasos:
-                pasos.classes("bg-teal-00")
-
-                with ui.step("Básico").classes("bg-teal-00"):
-                    inputSímbolo = ui.input(label="Símbolo Modena", value=self.símboloMoneda)
-                    inputNombre = ui.input(label="Nombre Impresora", value=self.infoImpresora.nombre)
-
-                    with ui.stepper_navigation():
-                        ui.button("Siguiente", on_click=salvarSímbolo)
-
-                with ui.step("Impresora"):
-                    inputCostoImpresora = ui.number(label="Costo Impresora", value=self.infoImpresora.costo, step=1)
-                    inputCostoImpresora.props(f"prefix={self.símboloMoneda}")
-
-                    inputEnvioImpresora = ui.number(label="Envió Impresora", value=self.infoImpresora.envio)
-                    inputEnvioImpresora.props(f"prefix={self.símboloMoneda}")
-
-                    inputMantenimiento = ui.number(label="Mantenimiento Anual", value=self.infoImpresora.mantenimiento)
-                    inputMantenimiento.props(f"prefix={self.símboloMoneda}")
-
-                    inputVidaUtil = ui.number(label="Vida util", value=self.infoImpresora.vidaUtil)
-                    inputVidaUtil.props("suffix=años")
-
-                    inputTiempoTrabajo = ui.number(label="Tiempo Trabajo", value=self.infoImpresora.tiempoTrabajo)
-                    inputTiempoTrabajo.props("prefix=%")
-
-                    inputConsumo = ui.number(label="Consumo", value=self.infoImpresora.consumo)
-                    inputConsumo.props("suffix=watts")
-
-                    with ui.stepper_navigation():
-                        ui.button("Siguiente", on_click=pasos.next)
-                        ui.button("Anterior", on_click=pasos.previous).props("flat")
-
-                with ui.step("Ensamblaje"):
-                    inputTrabajo = ui.number(label="Hora trabajo", value=self.costoHoraTrabajo)
-                    inputTrabajo.props(f"prefix={self.símboloMoneda}")
-
-                    inputKWH = ui.number(label="Costo kWh", value=self.costoElectricidad)
-                    inputKWH.props(f"prefix={self.símboloMoneda}")
-
-                    inputMerma = ui.number(label="Merma en Fabricación", value=self.errorFabricacion)
-                    inputMerma.props("prefix=%")
-                    with inputMerma:
-                        ui.tooltip("")
-
-                    with ui.stepper_navigation():
-                        ui.button("Siguiente", on_click=pasos.next)
-                        ui.button("Anterior", on_click=pasos.previous).props("flat")
-
-                with ui.step("Spoolman"):
-                    ui.label("Colección con API de filamento")
-
-                    inputSpoolman = ui.input(label="URL del servicio de Spoolman", value=self.urlSpoolman)
-
-                    inputFilamento = ui.number(label="Precio Filamento (Si no Spoolman)", value=self.precioFilamento)
-                    inputFilamento.props(f"prefix={self.símboloMoneda}")
-
-                    with ui.stepper_navigation():
-                        ui.button("Siguiente", on_click=pasos.next)
-                        ui.button("Anterior", on_click=pasos.previous).props("flat")
-
-                with ui.step("Ganancia"):
-                    inputGanancia = ui.number(label="Ganancia", value=self.porcentajeGananciaBase)
-                    inputGanancia.props("prefix=%")
-
-                    with ui.stepper_navigation():
-                        ui.button("Salvar", on_click=salvarConfiguration)
-                        ui.button("Anterior", on_click=pasos.previous).props("flat")
-
-                inputImpresora = {
-                    inputSímbolo,
-                    inputNombre,
-                    inputCostoImpresora,
-                    inputEnvioImpresora,
-                    inputMantenimiento,
-                    inputVidaUtil,
-                    inputTiempoTrabajo,
-                    inputConsumo,
-                    inputSpoolman,
-                    inputFilamento,
-                    inputTrabajo,
-                    inputGanancia,
-                    inputMerma,
-                    inputKWH,
-                }
-
-                anchoInput: str = "w-60"
-                for entrada in inputImpresora:
-                    entrada.classes(anchoInput)
-
-            agregarInterface(interface, current_page="/config")
-            return
-
         @ui.page("/")
         def paginaInicio():
 
@@ -1289,6 +1147,8 @@ class printtool:
                 pie.style("height: 5vh; padding: 1px")
                 with ui.row().classes("w-full justify-center items-center"):
                     ui.label("Creado por ChepeCarlos").classes("text-white")
+
+        registraPaginaConfig(self, agregarInterface, interface)
 
     def iniciarGui(self) -> None:
         """Iniciar la interfaz gráfica de usuario."""
