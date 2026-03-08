@@ -351,10 +351,11 @@ class printtool:
                 with ui.row().classes("w-full justify-center items-center"):
                     with ui.column().classes("justify-center items-center"):
                         with ui.row().props("rounded outlined dense"):
-                            self.textoTiempoEnsamblado = ui.input(
+                            self.textoTiempoEnsamblado = ui.number(
                                 label="Tiempo Ensamblado (Minutos)",
                                 value=self.tiempoEnsamblado,
-                                validation=self.validar_numero,
+                                validation=self.validar_numero_no_negativo,
+                                step=1,
                             ).props("rounded outlined dense")
                             ui.button(on_click=self.actualizarEnsamblado, icon="send")
                             self.textoTiempoEnsamblado.on("keydown.enter", self.actualizarEnsamblado)
@@ -455,12 +456,67 @@ class printtool:
         try:
             float(value)  # Intentar convertir el valor a float
             return None  # Si es válido, no hay error
-        except ValueError:
+        except (TypeError, ValueError):
             return "No es un número válido"
         # Si falla, devolver mensaje de error
 
+    def validar_numero_no_negativo(self, value):
+        """Validar que el valor sea numérico y no negativo."""
+        if value is None or value == "":
+            return "Campo obligatorio"
+        try:
+            if float(value) < 0:
+                return "No puede ser negativo"
+            return None
+        except (TypeError, ValueError):
+            return "No es un número válido"
+
+    def validar_entero_no_negativo(self, value):
+        """Validar que el valor sea entero y no negativo."""
+        if value is None or value == "":
+            return "Campo obligatorio"
+        try:
+            numero = float(value)
+            if numero < 0:
+                return "No puede ser negativo"
+            if not numero.is_integer():
+                return "Debe ser un número entero"
+            return None
+        except (TypeError, ValueError):
+            return "No es un número válido"
+
+    def validar_texto_requerido(self, value):
+        if value is None or str(value).strip() == "":
+            return "Campo obligatorio"
+        return None
+
+    def parse_float_seguro(self, value):
+        """Convierte a float aceptando coma decimal. Retorna None si falla."""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            value = value.strip().replace(",", ".")
+            if value == "":
+                return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def parse_int_seguro(self, value):
+        """Convierte a int de forma segura. Retorna None si falla."""
+        numero = self.parse_float_seguro(value)
+        if numero is None or not float(numero).is_integer():
+            return None
+        return int(numero)
+
     def actualizarEnsamblado(self):
-        self.tiempoEnsamblado = float(self.textoTiempoEnsamblado.value)
+        tiempo = self.parse_float_seguro(self.textoTiempoEnsamblado.value)
+        if tiempo is None or tiempo < 0:
+            ui.notify("Ingrese un tiempo de ensamblado valido (>= 0)", type="negative")
+            return
+
+        self.tiempoEnsamblado = tiempo
         SalvarValor(self.archivoInfo, "tiempo_ensamblaje", self.tiempoEnsamblado, local=False)
         # self.cargarCostos()
         ui.notify(f"Tiempo de ensamblado actualizado a {self.tiempoEnsamblado} minutos")
@@ -882,10 +938,11 @@ class printtool:
                 with ui.column().classes("justify-center items-center gap-2"):
                     ui.label("Actualizar Precio de Venta").classes("font-bold")
                     with ui.row().props("rounded outlined").classes("items-center gap-2"):
-                        self.textoVenta = ui.input(
+                        self.textoVenta = ui.number(
                             label="Nuevo Precio",
                             value=self.precioVentaFinal,
-                            validation=self.validar_numero,
+                            validation=self.validar_numero_no_negativo,
+                            step=0.01,
                         ).classes("min-w-48")
                         ui.button(on_click=self.actualizarPrecios, icon="check").props("color=positive").classes(
                             "h-full"
@@ -893,7 +950,12 @@ class printtool:
                         self.textoVenta.on("keydown.enter", self.actualizarPrecios)
 
     def actualizarPrecios(self):
-        self.precioVentaFinal = float(self.textoVenta.value)
+        precio = self.parse_float_seguro(self.textoVenta.value)
+        if precio is None or precio < 0:
+            ui.notify("Ingrese un precio valido (>= 0)", type="negative")
+            return
+
+        self.precioVentaFinal = precio
         SalvarValor(self.archivoInfo, "precio_venta", self.precioVentaFinal, local=False)
         logger.info(f"Actualizar precios {self.precioVentaFinal}")
 
@@ -904,18 +966,20 @@ class printtool:
     def cargarGuiActualizar(self):
         "Crear interface para actualizar datos del modelo"
 
-        ui.label("Editar información").classes("w-64")
+        with ui.column().classes("w-full items-center"):
+            ui.label("Editar información").classes("text-h5 font-bold text-center w-full q-mb-sm")
+            ui.separator().classes("w-64 q-mb-md")
 
-        ui.label(f"Proyecto: {self.folderProyecto}").classes("w-64").classes("text-white w-64 text-center break-words")
+            ui.label(f"Proyecto: {self.folderProyecto}").classes("text-white w-64 text-center break-words")
 
-        self.textoNombre = ui.input(label="Nombre", value=self.nombreModelo)
+        self.textoNombre = ui.input(label="Nombre", value=self.nombreModelo, validation=self.validar_texto_requerido)
         self.textoNombre.classes("w-64")
         self.textoNombre.on("keydown.enter", self.guardarModelo)
 
         self.textoPropiedad = ui.input(label="Propiedad", value=self.propiedadModelo).classes("w-64")
         self.tipoImpresion = ui.select(self.tipoProductos, label="tipo", value=self.tipoModelo).classes("w-64")
-        self.textoInventario = ui.input(
-            label="Inventario", value=self.inventario, validation=self.validar_numero
+        self.textoInventario = ui.number(
+            label="Inventario", value=self.inventario, validation=self.validar_entero_no_negativo, step=1
         ).classes("w-64")
 
         self.textoSKU = ui.input(label="SKU", value=self.skuModelo).classes("w-64")
@@ -943,8 +1007,19 @@ class printtool:
         "Guardar información del modelo en el archivo info.md"
 
         # Obtener valores de los campos
-        self.nombreModelo = self.textoNombre.value
-        self.inventario = int(self.textoInventario.value)
+        nombre = self.textoNombre.value if self.textoNombre.value is not None else ""
+        inventario = self.parse_int_seguro(self.textoInventario.value)
+
+        if str(nombre).strip() == "":
+            ui.notify("El nombre del modelo es obligatorio", type="negative")
+            return
+
+        if inventario is None or inventario < 0:
+            ui.notify("El inventario debe ser un entero >= 0", type="negative")
+            return
+
+        self.nombreModelo = nombre
+        self.inventario = inventario
         self.linkModelo = self.textoLink.value
         self.skuModelo = self.textoSKU.value
         self.propiedadModelo = self.textoPropiedad.value
