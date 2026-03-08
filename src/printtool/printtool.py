@@ -1183,7 +1183,7 @@ class printtool:
                 for entrada in inputImpresora:
                     entrada.classes(anchoInput)
 
-            agregarInterface(interface)
+            agregarInterface(interface, current_page="/config")
             return
 
         @ui.page("/")
@@ -1216,9 +1216,9 @@ class printtool:
                         row.classes("w-full justify-center items-center")
                         self.cargarGuiActualizar()
 
-            agregarInterface(interface)
+            agregarInterface(interface, current_page="/")
 
-        def agregarInterface(interface: bool):
+        def agregarInterface(interface: bool, current_page: str = ""):
 
             if not interface:
                 return
@@ -1261,15 +1261,28 @@ class printtool:
                     with ui.button(icon="menu") as botón:
                         botón.props("color=bg-teal-700")
                         with ui.menu() as menu:
-                            menu.classes("items-center")
-                            ui.menu_item("Cambiar Proyecto", on_click=show)
-                            with ui.column().classes("w-full justify-center items-center"):
-                                ui.link("Inicio", paginaInicio)
-                                ui.link("Config", paginaConfigurar)
+                            menu.classes("min-w-48 text-center")
+
+                            estilo_menu = "w-full px-2 justify-center"
+
+                            if current_page != "/":
+                                ui.menu_item("Inicio", on_click=lambda: ui.navigate.to("/")).classes(
+                                    estilo_menu
+                                ).style("text-align: center;")
+
+                            ui.menu_item("Cambiar Proyecto", on_click=show).classes(estilo_menu).style(
+                                "text-align: center;"
+                            )
+
+                            if current_page != "/config":
+                                ui.menu_item("Configurar", on_click=lambda: ui.navigate.to("/config")).classes(
+                                    estilo_menu
+                                ).style("text-align: center;")
+
                             ui.separator()
-                            with ui.button(icon="power_settings_new", on_click=app.shutdown) as botónApagar:
-                                botónApagar.props("color=negative")
-                                botónApagar.classes("w-full justify-center items-center")
+                            ui.menu_item("Salir", on_click=app.shutdown).classes(f"{estilo_menu} text-red-500").style(
+                                "text-align: center;"
+                            )
 
             with ui.footer() as pie:
                 pie.classes("bg-teal-700")
