@@ -28,6 +28,8 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
             ui.notify("Se actualizo las configuraciones")
 
             tool.urlSpoolman = input_spoolman.value
+            tool.urlDolibarr = input_dolibarr.value
+            tool.token_dolibarr = input_dolibarr_token.value
 
             tool.infoImpresora.nombre = input_nombre.value
             tool.infoImpresora.costo = input_costo_impresora.value
@@ -48,6 +50,8 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
                 SalvarValor(tool.archivoConfig, "costo_filamento", tool.precioFilamento)
 
             SalvarValor(tool.archivoConfig, "url_spoolman", tool.urlSpoolman)
+            SalvarValor(tool.archivoConfig, "url_dolibarr", tool.urlDolibarr)
+            SalvarValor(tool.archivoConfig, "token_dolibarr", token_dolibarr)
 
             SalvarValor(tool.archivoConfig, "nombre_impresora", tool.infoImpresora.nombre)
             SalvarValor(tool.archivoConfig, "costo_impresora", tool.infoImpresora.costo)
@@ -123,6 +127,24 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
                     ui.button("Siguiente", on_click=pasos.next)
                     ui.button("Anterior", on_click=pasos.previous).props("flat")
 
+            with ui.step("Dolibarr-ERP"):
+                ui.label(
+                    "Configura la URL de tu servicio de Dolibarr para actualizar el precio del producto y otras información"
+                )
+
+                input_dolibarr = ui.input(label="URL del servicio de Dolibarr", value=tool.urlDolibarr)
+
+                input_dolibarr_token = ui.input(
+                    label="Token del servicio de Dolibarr",
+                    value=tool.infoBase.get("token_dolibarr", ""),
+                    password=True,
+                    password_toggle_button=True,
+                )
+
+                with ui.stepper_navigation():
+                    ui.button("Siguiente", on_click=pasos.next)
+                    ui.button("Anterior", on_click=pasos.previous).props("flat")
+
             with ui.step("Ganancia"):
                 input_ganancia = ui.number(label="Ganancia", value=tool.porcentajeGananciaBase)
                 input_ganancia.props("prefix=%")
@@ -141,6 +163,8 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
                 input_tiempo_trabajo,
                 input_consumo,
                 input_spoolman,
+                input_dolibarr,
+                input_dolibarr_token,
                 input_filamento,
                 input_trabajo,
                 input_ganancia,
