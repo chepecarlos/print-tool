@@ -27,6 +27,9 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
         def salvar_configuration() -> None:
             ui.notify("Se actualizo las configuraciones")
 
+            def _salvar(campo: str, valor) -> None:
+                SalvarValor(tool.archivoConfig, campo, valor)
+
             tool.urlSpoolman = input_spoolman.value
             tool.urlDolibarr = input_dolibarr.value
             tool.token_dolibarr = input_dolibarr_token.value
@@ -47,24 +50,33 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
 
             if input_filamento.value is not None and input_filamento.value != "":
                 tool.precioFilamento = input_filamento.value
-                SalvarValor(tool.archivoConfig, "costo_filamento", tool.precioFilamento)
+                _salvar("costo_filamento", tool.precioFilamento)
 
-            SalvarValor(tool.archivoConfig, "url_spoolman", tool.urlSpoolman)
-            SalvarValor(tool.archivoConfig, "url_dolibarr", tool.urlDolibarr)
-            SalvarValor(tool.archivoConfig, "token_dolibarr", token_dolibarr)
+            data_base = {
+                "url_spoolman": tool.urlSpoolman,
+                "url_dolibarr": tool.urlDolibarr,
+                "token_dolibarr": tool.token_dolibarr,
+                "costo_hora_trabajo": tool.costoHoraTrabajo,
+                "costo_electricidad": tool.costoElectricidad,
+                "error_fabricacion": tool.errorFabricacion,
+                "ganancia": tool.porcentajeGananciaBase,
+            }
 
-            SalvarValor(tool.archivoConfig, "nombre_impresora", tool.infoImpresora.nombre)
-            SalvarValor(tool.archivoConfig, "costo_impresora", tool.infoImpresora.costo)
-            SalvarValor(tool.archivoConfig, "envio_impresora", tool.infoImpresora.envio)
-            SalvarValor(tool.archivoConfig, "mantenimiento_impresora", tool.infoImpresora.mantenimiento)
-            SalvarValor(tool.archivoConfig, "vida_util_impresora", tool.infoImpresora.vidaUtil)
-            SalvarValor(tool.archivoConfig, "consumo_impresora", tool.infoImpresora.consumo)
-            SalvarValor(tool.archivoConfig, "tiempo_trabajo_impresora", tool.infoImpresora.tiempoTrabajo)
+            data_impresora = {
+                "nombre_impresora": tool.infoImpresora.nombre,
+                "costo_impresora": tool.infoImpresora.costo,
+                "envio_impresora": tool.infoImpresora.envio,
+                "mantenimiento_impresora": tool.infoImpresora.mantenimiento,
+                "vida_util_impresora": tool.infoImpresora.vidaUtil,
+                "consumo_impresora": tool.infoImpresora.consumo,
+                "tiempo_trabajo_impresora": tool.infoImpresora.tiempoTrabajo,
+            }
 
-            SalvarValor(tool.archivoConfig, "costo_hora_trabajo", tool.costoHoraTrabajo)
-            SalvarValor(tool.archivoConfig, "costo_electricidad", tool.costoElectricidad)
-            SalvarValor(tool.archivoConfig, "error_fabricacion", tool.errorFabricacion)
-            SalvarValor(tool.archivoConfig, "ganancia", tool.porcentajeGananciaBase)
+            for campo, valor in data_base.items():
+                _salvar(campo, valor)
+
+            for campo, valor in data_impresora.items():
+                _salvar(campo, valor)
 
         with ui.stepper().props("vertical").classes("w-full") as pasos:
             pasos.classes("bg-teal-00")
@@ -136,7 +148,7 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
 
                 input_dolibarr_token = ui.input(
                     label="Token del servicio de Dolibarr",
-                    value=tool.infoBase.get("token_dolibarr", ""),
+                    value=tool.token_dolibarr,
                     password=True,
                     password_toggle_button=True,
                 )

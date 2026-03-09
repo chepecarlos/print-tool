@@ -50,6 +50,7 @@ def cargarPaginaActualizar(tool: "printtool") -> None:
         propiedad = tool.textoPropiedad.value if tool.textoPropiedad.value is not None else ""
         tipo = tool.tipoImpresion.value if tool.tipoImpresion.value is not None else "desconocido"
         descripcion = tool.textoDescripcion.value if tool.textoDescripcion.value is not None else ""
+        idProducto = getattr(tool, "textoIdProducto", None)
 
         if str(nombre).strip() == "":
             ui.notify("El nombre del modelo es obligatorio", type="negative")
@@ -57,6 +58,10 @@ def cargarPaginaActualizar(tool: "printtool") -> None:
 
         if inventario is None or inventario < 0:
             ui.notify("El inventario debe ser un entero >= 0", type="negative")
+            return
+
+        if idProducto is None or idProducto < 0:
+            ui.notify("El ID del producto debe ser un entero >= 0", type="negative")
             return
 
         valid_link = _validar_link(link)
@@ -84,39 +89,71 @@ def cargarPaginaActualizar(tool: "printtool") -> None:
         tool.propiedadModelo = str(propiedad).strip()
         tool.tipoModelo = tipo
         tool.descripciónModelo = str(descripcion).strip()
+        tool.idProductoDolibarr = idProducto if idProducto is not None else 0
 
-        SalvarValor(tool.archivoInfo, "nombre", tool.nombreModelo, local=False)
-        SalvarValor(tool.archivoInfo, "link", tool.linkModelo, local=False)
-        SalvarValor(tool.archivoInfo, "tipo", tool.tipoModelo, local=False)
-        SalvarValor(tool.archivoInfo, "inventario", tool.inventario, local=False)
-        SalvarValor(tool.archivoInfo, "propiedad", tool.propiedadModelo, local=False)
-        SalvarValor(tool.archivoInfo, "descripción", tool.descripciónModelo, local=False)
-        SalvarValor(tool.archivoInfo, "sku", tool.skuModelo, local=False)
+        def _salvar(campo: str, valor) -> None:
+            SalvarValor(tool.archivoInfo, campo, valor, local=False)
 
-        logger.info("Guardando informacion del modelo")
-        ui.notify("Salvando informacion")
+        datos_modelo = {
+            "nombre": tool.nombreModelo,
+            "link": tool.linkModelo,
+            "tipo": tool.tipoModelo,
+            "inventario": tool.inventario,
+            "propiedad": tool.propiedadModelo,
+            "descripción": tool.descripciónModelo,
+            "sku": tool.skuModelo,
+            "idProductoDolibarr": tool.idProductoDolibarr,
+        }
+        for campo, valor in datos_modelo.items():
+            _salvar(campo, valor)
+
+        logger.info("Guardando información del modelo")
+        ui.notify("Salvando información")
 
     with ui.column().classes("w-full items-center"):
-        ui.label("Editar informacion").classes("text-h5 font-bold text-center w-full q-mb-sm")
+        ui.label("Editar información").classes("text-h5 font-bold text-center w-full q-mb-sm")
         ui.separator().classes("w-64 q-mb-md")
         ui.label(f"Ruta proyecto: {tool.folderProyecto}").classes("text-white w-64 text-center break-words")
 
     with ui.grid(columns=2).classes("gap-3 max-w-3xl mx-auto justify-items-center"):
+
         tool.textoNombre = ui.input(
             label="Nombre",
             value=tool.nombreModelo,
             validation=tool.validar_texto_requerido,
-        ).classes("w-64")
-        tool.textoPropiedad = ui.input(label="Propiedad", value=tool.propiedadModelo).classes("w-64")
-        tool.tipoImpresion = ui.select(tool.tipoProductos, label="tipo", value=tool.tipoModelo).classes("w-64")
+        )
+        tool.textoPropiedad = ui.input(label="Propiedad", value=tool.propiedadModelo)
+        tool.tipoImpresion = ui.select(tool.tipoProductos, label="tipo", value=tool.tipoModelo)
         tool.textoInventario = ui.number(
             label="Inventario",
             value=tool.inventario,
             validation=tool.validar_entero_no_negativo,
             step=1,
-        ).classes("w-64")
-        tool.textoSKU = ui.input(label="SKU", value=tool.skuModelo, validation=_validar_sku).classes("w-64")
-        tool.textoLink = ui.input(label="Link", value=tool.linkModelo, validation=_validar_link).classes("w-64")
+        )
+        tool.textoSKU = ui.input(label="SKU", value=tool.skuModelo, validation=_validar_sku)
+        tool.textoLink = ui.input(label="Link", value=tool.linkModelo, validation=_validar_link)
+
+        anchoSimilar = {
+            tool.textoNombre,
+            tool.textoPropiedad,
+            tool.tipoImpresion,
+            tool.textoInventario,
+            tool.textoSKU,
+            tool.textoLink,
+        }
+
+        if tool.urlDolibarr != "" and tool.token_dolibarr != "":
+            tool.textoIdProducto = ui.number(
+                label="ID Producto Dolibarr",
+                value=tool.idProductoDolibarr,
+                validation=tool.validar_entero_no_negativo,
+                step=1,
+            )
+            anchoSimilar.add(tool.textoIdProducto)
+
+        for entrada in anchoSimilar:
+            entrada.classes("w-64")
+
         tool.textoDescripcion = (
             ui.textarea(
                 label="Descripcion",
@@ -130,12 +167,5 @@ def cargarPaginaActualizar(tool: "printtool") -> None:
     with ui.row().classes("w-full justify-center mt-2"):
         ui.button("Guardar", on_click=guardarModelo).classes("w-64")
 
-    for entrada in [
-        tool.textoNombre,
-        tool.textoPropiedad,
-        tool.tipoImpresion,
-        tool.textoInventario,
-        tool.textoSKU,
-        tool.textoLink,
-    ]:
+    for entrada in anchoSimilar:
         entrada.on("keydown.enter", lambda: guardarModelo())

@@ -237,6 +237,7 @@ class printtool:
         self.descripciónModelo = self.infoCostos.get("descripción", "")
         self.tipoModelo = self.infoCostos.get("tipo", "desconocido")
         self.tiempoEnsamblado = float(self.infoCostos.get("tiempo_ensamblaje", 0))
+        self.idProductoDolibarr = float(self.infoCostos.get("id_producto_dolibarr", 0))
 
         if self.tipoModelo not in self.tipoProductos:
             self.tipoModelo = "desconocido"
