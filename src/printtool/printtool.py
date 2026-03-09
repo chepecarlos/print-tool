@@ -2,6 +2,7 @@ from nicegui import ui, app, run
 import os
 import codecs
 import re
+import shutil
 from pathlib import Path
 
 from printtool.dataGcode import dataGcode
@@ -181,8 +182,25 @@ class printtool:
         if self.folderProyecto is None:
             logger.info("Usando folder actual para proyecto")
             self.folderProyecto = Path.cwd()
-        self.archivoInfo = os.path.join(self.folderProyecto, "info.md")
-        self.archivoExtras = os.path.join(self.folderProyecto, "extras.md")
+
+        folderData = os.path.join(self.folderProyecto, ".printtool")
+        os.makedirs(folderData, exist_ok=True)
+
+        archivoInfoLegacy = os.path.join(self.folderProyecto, "info.md")
+        archivoExtrasLegacy = os.path.join(self.folderProyecto, "extras.md")
+
+        self.archivoInfo = os.path.join(folderData, "info.md")
+        self.archivoExtras = os.path.join(folderData, "extras.md")
+
+        # Migracion suave: si existe data antigua en la raiz del proyecto,
+        # se copia al nuevo folder oculto la primera vez.
+        if not os.path.exists(self.archivoInfo) and os.path.exists(archivoInfoLegacy):
+            shutil.copy2(archivoInfoLegacy, self.archivoInfo)
+            logger.info(f"Migrando info.md a {self.archivoInfo}")
+
+        if not os.path.exists(self.archivoExtras) and os.path.exists(archivoExtrasLegacy):
+            shutil.copy2(archivoExtrasLegacy, self.archivoExtras)
+            logger.info(f"Migrando extras.md a {self.archivoExtras}")
 
         dataBaseInfo = obtenerArchivoPaquete("printtool", "config/info.md")
         if dataBaseInfo is None:
