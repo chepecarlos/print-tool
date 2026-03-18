@@ -21,6 +21,7 @@ from printtool.MiLibrerias import (
 from printtool.extrasGui import seleccionarFolderThinter
 from printtool.paginaConfig import registraPaginaConfig
 from printtool.paginaActualizar import cargarPaginaActualizar
+from printtool.paginaPrecio import cargarPaginaPrecio
 
 
 logger = ConfigurarLogging(__name__)
@@ -890,92 +891,7 @@ class printtool:
         self.costosExtras()
 
     def cargarGuiPrecio(self):
-
-        dataPrecio = [
-            {
-                "referencia": "costoUnidad",
-                "final": "costoUnidad",
-                "humano": "Costo Fabricación",
-                "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
-            },
-            {
-                "referencia": "porcentajeGananciaBase",
-                "final": "porcentajeGananciaFinal",
-                "humano": "Porcentaje de Ganancia",
-                "formato": lambda x: f"{x:.2f} %",
-            },
-            {
-                "referencia": "gananciaBase",
-                "final": "gananciaFinal",
-                "humano": "Ganancia",
-                "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
-            },
-            {
-                "referencia": "precioSinIvaReferencia",
-                "final": "precioSinIvaFinal",
-                "humano": "Precio antes iva",
-                "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
-            },
-            {
-                "referencia": "ivaReferencia",
-                "final": "ivaFinal",
-                "humano": "Iva",
-                "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
-            },
-            {
-                "referencia": "precioVentaReferencia",
-                "final": "precioVentaFinal",
-                "humano": "Precio Venta",
-                "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
-            },
-        ]
-
-        with ui.column().classes("w-full justify-center items-center"):
-            with ui.grid(columns=3).classes("justify-center items-center w-full max-w-2xl gap-4"):
-                # encabezados
-                ui.label("Calculo").classes("font-bold text-center")
-                ui.label("Referencia").classes("font-bold text-center")
-                ui.label("Final").classes("font-bold text-center")
-
-                # filas de datos
-                for idPrecio, precioActual in enumerate(dataPrecio):
-                    esUltimo = idPrecio == len(dataPrecio) - 1  # último elemento
-
-                    if esUltimo:
-                        # separador antes del total
-                        ui.separator().classes("col-span-3 my-2")
-
-                    # nombre
-                    ui.label(precioActual["humano"]).classes("text-left" + (" font-bold text-lg" if esUltimo else ""))
-                    # referencia
-                    ui.label().bind_text_from(
-                        self,
-                        precioActual["referencia"],
-                        lambda x, transform_func=precioActual["formato"]: transform_func(x),
-                    ).classes("text-center" + (" font-bold text-lg" if esUltimo else ""))
-                    # final
-                    ui.label().bind_text_from(
-                        self,
-                        precioActual["final"],
-                        lambda x, transform_func=precioActual["formato"]: transform_func(x),
-                    ).classes("text-center" + (" font-bold text-lg text-green-400" if esUltimo else ""))
-
-            # control para actualizar precio de venta
-            ui.separator().classes("my-4 w-full")
-            with ui.row().classes("w-full justify-center"):
-                with ui.column().classes("justify-center items-center gap-2"):
-                    ui.label("Actualizar Precio de Venta").classes("font-bold")
-                    with ui.row().props("rounded outlined").classes("items-center gap-2"):
-                        self.textoVenta = ui.number(
-                            label="Nuevo Precio",
-                            value=self.precioVentaFinal,
-                            validation=self.validar_numero_no_negativo,
-                            step=0.01,
-                        ).classes("min-w-48")
-                        ui.button(on_click=self.actualizarPrecios, icon="check").props("color=positive").classes(
-                            "h-full"
-                        )
-                        self.textoVenta.on("keydown.enter", self.actualizarPrecios)
+        cargarPaginaPrecio(self)
 
     def actualizarPrecios(self):
         precio = self.parse_float_seguro(self.textoVenta.value)
