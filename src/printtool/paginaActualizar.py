@@ -102,7 +102,7 @@ def cargarPaginaActualizar(tool: "printtool") -> None:
             "propiedad": tool.propiedadModelo,
             "descripción": tool.descripciónModelo,
             "sku": tool.skuModelo,
-            "idProductoDolibarr": tool.idProductoDolibarr,
+            "id_producto_dolibarr": tool.idProductoDolibarr,
         }
         for campo, valor in datos_modelo.items():
             _salvar(campo, valor)
