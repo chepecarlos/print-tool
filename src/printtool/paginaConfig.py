@@ -32,7 +32,7 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
 
             tool.urlSpoolman = input_spoolman.value
             tool.urlDolibarr = input_dolibarr.value
-            tool.token_dolibarr = input_dolibarr_token.value
+            tool.tokenDolibarr = input_dolibarr_token.value
 
             tool.infoImpresora.nombre = input_nombre.value
             tool.infoImpresora.costo = input_costo_impresora.value
@@ -55,7 +55,7 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
             data_base = {
                 "url_spoolman": tool.urlSpoolman,
                 "url_dolibarr": tool.urlDolibarr,
-                "token_dolibarr": tool.token_dolibarr,
+                "token_dolibarr": tool.tokenDolibarr,
                 "costo_hora_trabajo": tool.costoHoraTrabajo,
                 "costo_electricidad": tool.costoElectricidad,
                 "error_fabricacion": tool.errorFabricacion,
@@ -148,7 +148,7 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
 
                 input_dolibarr_token = ui.input(
                     label="Token del servicio de Dolibarr",
-                    value=tool.token_dolibarr,
+                    value=tool.tokenDolibarr,
                     password=True,
                     password_toggle_button=True,
                 )

@@ -50,7 +50,7 @@ def cargarPaginaActualizar(tool: "printtool") -> None:
         propiedad = tool.textoPropiedad.value if tool.textoPropiedad.value is not None else ""
         tipo = tool.tipoImpresion.value if tool.tipoImpresion.value is not None else "desconocido"
         descripcion = tool.textoDescripcion.value if tool.textoDescripcion.value is not None else ""
-        idProducto = getattr(tool, "textoIdProducto", None)
+        idProducto = int(getattr(tool, "textoIdProducto", 0).value if hasattr(tool, "textoIdProducto") else 0)
 
         if str(nombre).strip() == "":
             ui.notify("El nombre del modelo es obligatorio", type="negative")
@@ -142,7 +142,7 @@ def cargarPaginaActualizar(tool: "printtool") -> None:
             tool.textoLink,
         }
 
-        if tool.urlDolibarr != "" and tool.token_dolibarr != "":
+        if tool.urlDolibarr != "" and tool.tokenDolibarr != "":
             tool.textoIdProducto = ui.number(
                 label="ID Producto Dolibarr",
                 value=tool.idProductoDolibarr,

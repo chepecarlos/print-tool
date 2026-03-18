@@ -134,7 +134,7 @@ class printtool:
 
     urlDolibarr: str = ""
     "Url para hacer consultas a Dolibarr y actualizar precios y stock"
-    token_dolibarr: str = ""
+    tokenDolibarr: str = ""
     "Token para autenticación en Dolibarr"
 
     def __init__(self) -> None:
@@ -175,6 +175,7 @@ class printtool:
         self.urlSpoolman = self.infoBase.get("url_spoolman", "")
         self.precioFilamento = self.infoBase.get("precio_filamento", 0)
         self.urlDolibarr = self.infoBase.get("url_dolibarr", "")
+        self.tokenDolibarr = self.infoBase.get("token_dolibarr", "")
 
     def configurarData(self) -> None:
         """Configurar la carpeta del proyecto y los archivos de información."""
