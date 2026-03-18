@@ -7,9 +7,13 @@ from nicegui import ui
 if TYPE_CHECKING:
     from printtool.printtool import printtool
 
+from .utilidades.miDolibarr import consultarPrecioDolibarr, actualizarPrecioDolibarr
+
 
 def cargarPaginaPrecio(tool: "printtool") -> None:
     """Construir la interfaz de la pestana de precios."""
+
+    dolibarr_configurado = bool(tool.urlDolibarr and tool.tokenDolibarr)
 
     dataPrecio = [
         {
@@ -87,3 +91,52 @@ def cargarPaginaPrecio(tool: "printtool") -> None:
                     ).classes("min-w-48")
                     ui.button(on_click=tool.actualizarPrecios, icon="check").props("color=positive").classes("h-full")
                     tool.textoVenta.on("keydown.enter", tool.actualizarPrecios)
+
+        ui.separator().classes("my-4 w-full")
+        with ui.row().classes("w-full justify-center"):
+            with ui.column().classes("justify-center items-center gap-2"):
+                ui.label("Dolibarr ERP").classes("font-bold")
+
+                def _consultar():
+                    precio = consultarPrecioDolibarr(
+                        tool.urlDolibarr,
+                        tool.tokenDolibarr,
+                        tool.idProductoDolibarr,
+                    )
+                    if precio is not None:
+                        tool.textoVenta.set_value(precio)
+                        tool.actualizarPrecios()
+                        ui.notify(
+                            f"Precio consultado desde Dolibarr: {tool.símboloMoneda}{precio:.2f}", type="positive"
+                        )
+
+                def _actualizar():
+                    actualizarPrecioDolibarr(
+                        tool.urlDolibarr,
+                        tool.tokenDolibarr,
+                        tool.idProductoDolibarr,
+                        tool.precioVentaFinal,
+                    )
+
+                with ui.row().classes("items-center gap-2"):
+                    boton_consultar = ui.button(
+                        "Consultar precio en Dolibarr",
+                        on_click=_consultar,
+                        icon="search",
+                    ).props("outline")
+                    with boton_consultar:
+                        ui.tooltip("Consultar el precio actual registrado en Dolibarr.")
+                    boton_actualizar = ui.button(
+                        "Actualizar precio en Dolibarr",
+                        on_click=_actualizar,
+                        icon="publish",
+                    ).props("outline")
+                    with boton_actualizar:
+                        ui.tooltip("Enviar el precio final del modelo a Dolibarr.")
+
+                if not dolibarr_configurado:
+                    boton_actualizar.disable()
+                    boton_consultar.disable()
+                    ui.label("Configure URL y token de Dolibarr para habilitar estas acciones.").classes(
+                        "text-orange-300 text-sm"
+                    )
