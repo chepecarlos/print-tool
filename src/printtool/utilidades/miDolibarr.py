@@ -1,4 +1,5 @@
 import requests
+import json
 from nicegui import ui
 
 from printtool.MiLibrerias.FuncionesLogging import ConfigurarLogging
@@ -10,11 +11,11 @@ def consultarPrecioDolibarr(urlServidor: str, token: str, idProducto: str) -> fl
     """Consultar el precio actual desde Dolibarr.
 
     Args:
-        urlServidor: URL base del servidor Dolibarr (ej. http://localhost/dolibarr)
-        token: Clave API de Dolibarr
-        idProducto: ID del producto a consultar en Dolibarr
+        urlServidor(str): URL base del servidor Dolibarr (ej. http://localhost/dolibarr)
+        token(str): Clave API de Dolibarr
+        idProducto(str): ID del producto a consultar en Dolibarr
     Returns:
-        Precio del producto consultado, o None si hubo un error.
+        float | None: Precio del producto consultado, o None si hubo un error.
     """
 
     endpoint = f"{urlServidor.rstrip('/')}/api/index.php/products/{idProducto}"
@@ -45,6 +46,30 @@ def consultarPrecioDolibarr(urlServidor: str, token: str, idProducto: str) -> fl
     return None
 
 
-def actualizarPrecioDolibarr(url: str, token: str, referencia: str, precio: float):
-    """Placeholder para enviar el precio actual a Dolibarr."""
-    ui.notify("Pendiente: actualizar precio en Dolibarr", type="info")
+def actualizarPrecioDolibarr(urlServidor: str, token: str, idProducto: str, precio: float) -> bool:
+    """Actualizar el precio de un producto en Dolibarr.
+
+    Args:
+        urlServidor(str): URL base del servidor Dolibarr (ej. http://localhost/dolibarr)
+        token(str): Clave API de Dolibarr
+        idProducto(str): ID del producto a actualizar en Dolibarr
+        precio(float): Nuevo precio a establecer en Dolibarr
+    Returns:
+        bool: True si la actualización fue exitosa, False en caso contrario.
+    """
+
+    endpoint = f"{urlServidor.rstrip('/')}/api/index.php/products/{idProducto}"
+    headers = {"DOLAPIKEY": token, "Content-Type": "application/json"}
+    data = {"price": precio, "price_ttc": precio}
+
+    response = requests.put(endpoint, headers=headers, json=data)
+
+    if response.status_code == 200:
+        logger.info(f"Precio actualizado correctamente en Dolibarr: {precio:.2f}")
+        ui.notify(f"Precio actualizado correctamente en Dolibarr: {precio:.2f}", type="success")
+        return True
+    else:
+        logger.warning(f"Error al actualizar el precio en Dolibarr: {response.status_code} - {response.text}")
+        ui.notify(f"Error al actualizar el precio en Dolibarr: {response.status_code} - {response.text}", type="error")
+
+    return False
