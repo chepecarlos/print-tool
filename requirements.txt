@@ -6,6 +6,7 @@ pywebview
 pywebview[gtk]
 # pywebview[qt]
 importlib-resources
+requests
 
 # Dependencia de submodulo MiLibrerias
 colorlog
