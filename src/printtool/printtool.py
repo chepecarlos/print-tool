@@ -20,6 +20,7 @@ from printtool.MiLibrerias import (
 
 from printtool.extrasGui import seleccionarFolderThinter
 from printtool.paginaConfig import registraPaginaConfig
+from printtool.paginaPurga import registraPaginaPurga
 from printtool.paginaActualizar import cargarPaginaActualizar
 from printtool.paginaPrecio import cargarPaginaPrecio
 
@@ -1022,6 +1023,11 @@ class printtool:
                                     estilo_menu
                                 ).style("text-align: center;")
 
+                            if current_page != "/purga":
+                                ui.menu_item("Calculo Purga MMU", on_click=lambda: ui.navigate.to("/purga")).classes(
+                                    estilo_menu
+                                ).style("text-align: center;")
+
                             ui.separator()
                             ui.menu_item("Salir", on_click=app.shutdown).classes(f"{estilo_menu} text-red-500").style(
                                 "text-align: center;"
@@ -1034,6 +1040,7 @@ class printtool:
                     ui.label("Creado por ChepeCarlos").classes("text-white")
 
         registraPaginaConfig(self, agregarInterface, interface)
+        registraPaginaPurga(self, agregarInterface, interface)
 
     def iniciarGui(self) -> None:
         """Iniciar la interfaz gráfica de usuario."""
