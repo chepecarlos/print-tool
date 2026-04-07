@@ -7,6 +7,7 @@ from nicegui import ui
 
 from printtool.MiLibrerias import ObtenerArchivo, SalvarValor, ConfigurarLogging
 from printtool.utilidades.miSpoolman import consultarFilamentosSpoolman
+from printtool.utilidades.token_search_select import TokenSearchSelect
 
 if TYPE_CHECKING:
     from printtool.printtool import printtool
@@ -90,8 +91,18 @@ def _texto_filamento(item: dict) -> str:
     material = item.get("material", "")
     marca = item.get("marca", "")
     color_hex = item.get("color_hex", "")
+    id_filamento = item.get("id", "")
+
+    id_mostrar = ""
+    id_filamento = str(id_filamento or "").strip()
+    if id_filamento:
+        # Mostrar solo el id numerico cuando venga con prefijos como
+        # "filament-77" o "spool-77".
+        id_mostrar = id_filamento.split("-")[-1]
 
     partes = [nombre]
+    if id_mostrar:
+        partes.insert(0, id_mostrar)
     if material:
         partes.append(material)
     if marca:
@@ -102,23 +113,62 @@ def _texto_filamento(item: dict) -> str:
     return " | ".join(partes)
 
 
-def _texto_filamento_opcion(item: dict) -> str:
-    """Texto para opciones del select.
+def _alias_busqueda_material(material: str) -> list[str]:
+    material_normalizado = str(material or "").strip().lower()
+    if material_normalizado == "":
+        return []
 
-    Se agrega una cola de tokens para que el buscador interno del select
-    encuentre combinaciones como "negro pla" sin un input adicional.
-    """
+    aliases = {
+        "pla": ["pla"],
+        "petg": ["petg", "ptge", "pteg", "pegt", "pgte"],
+        "abs": ["abs"],
+        "asa": ["asa"],
+        "tpu": ["tpu", "tup"],
+        "hips": ["hips", "hisp"],
+    }
+
+    return aliases.get(material_normalizado, [material_normalizado])
+
+
+def _tokens_busqueda(texto: str) -> list[str]:
+    base = str(texto or "").strip().lower()
+    for separador in ("|", ",", "/", "_", "(", ")"):
+        base = base.replace(separador, " ")
+    return [token for token in base.split() if token]
+
+
+def _opcion_filamento(item: dict) -> dict[str, str | list[str]]:
+    """Construye una opcion con etiqueta visible limpia y tokens reales para busqueda."""
     visible = _texto_filamento(item)
-    tokens = " ".join(
-        [
-            str(item.get("nombre") or "").strip(),
-            str(item.get("material") or "").strip(),
-            str(item.get("marca") or "").strip(),
-            str(item.get("color_hex") or "").strip(),
-        ]
-    )
-    tokens = " ".join(tokens.lower().split())
-    return f"{visible} || {tokens}" if tokens else visible
+    id_filamento = str(item.get("id") or "")
+    nombre = str(item.get("nombre") or "")
+    material = str(item.get("material") or "")
+    marca = str(item.get("marca") or "")
+    color_hex = str(item.get("color_hex") or "")
+
+    tokens: list[str] = []
+    for valor in (id_filamento, nombre, material, marca, color_hex):
+        for token in _tokens_busqueda(valor):
+            if token not in tokens:
+                tokens.append(token)
+
+    # Para IDs con prefijo como filament-77/spool-77, incluir tambien
+    # la parte numerica para buscar por "77" directamente.
+    if id_filamento and "-" in id_filamento:
+        id_corto = id_filamento.split("-")[-1].strip().lower()
+        if id_corto and id_corto not in tokens:
+            tokens.append(id_corto)
+
+    for alias in _alias_busqueda_material(material):
+        if alias not in tokens:
+            tokens.append(alias)
+
+    return {
+        "label": visible,
+        "display_label": visible,
+        "search_label": " ".join(tokens) or visible.lower(),
+        "search_terms": tokens,
+    }
 
 
 def _filamento_por_id(filamentos: list[dict]) -> dict[str, dict]:
@@ -145,8 +195,17 @@ def _linea_slot(slot_idx: int, slots: list[str], index_filamentos: dict[str, dic
     return f"Color {slot_idx + 1}: Sin asignar"
 
 
+def _color_hex_slot(slot_idx: int, slots: list[str], index_filamentos: dict[str, dict]) -> str:
+    slot_id = slots[slot_idx]
+    if slot_id and slot_id in index_filamentos:
+        color_hex = str(index_filamentos[slot_id].get("color_hex") or "").strip()
+        if color_hex.startswith("#") and len(color_hex) in (4, 7):
+            return color_hex
+    return "#222222"
+
+
 def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], None], interface: bool) -> None:
-    """Registrar la pagina /purga para configurar purga color a color en mm3."""
+    """Registrar la pagina /purga para configurar purga color a color en mmu3."""
 
     @ui.page("/purga")
     def pagina_purga() -> None:
@@ -167,17 +226,18 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
         index_filamentos = _filamento_por_id(fuente_filamentos)
 
         slots = _normalizar_slots(data_proyecto.get("purga_slots", data_global.get("purga_slots")))
-        matriz = _normalizar_matriz(data_proyecto.get("purga_mm3", data_global.get("purga_mm3")))
+        matriz = _normalizar_matriz(data_proyecto.get("purga_mmu3", data_global.get("purga_mmu3")))
 
-        opciones_filamentos = {item["id"]: _texto_filamento_opcion(item) for item in fuente_filamentos}
+        opciones_filamentos = {item["id"]: _opcion_filamento(item) for item in fuente_filamentos}
 
         slot_selectores: list = []
+        indicadores_color: dict[int, any] = {}
         labels_encabezado: dict[int, any] = {}
         labels_fila: dict[int, any] = {}
         inputs_matriz: dict[tuple[int, int], any] = {}
 
         with ui.column().classes("w-full items-center"):
-            ui.label("Referencia de purga por cambio de color (mm3)").classes("text-h6")
+            ui.label("Referencia de purga por cambio de color (MMU3)").classes("text-h6")
 
             estado_fuente = ui.label("").classes("text-sm text-cyan-300")
 
@@ -189,15 +249,30 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
 
                 with ui.column().classes("w-full gap-2"):
                     for idx in range(5):
-                        selector = ui.select(
-                            options=opciones_filamentos,
-                            value=slots[idx] if slots[idx] else None,
-                            label=f"Color {idx + 1}",
-                            with_input=True,
-                        ).classes("w-full")
+                        with ui.row().classes("w-full items-center no-wrap gap-2"):
+                            indicador = (
+                                ui.element("div")
+                                .classes("w-8 h-8 rounded border border-gray-500 shrink-0")
+                                .style(f"background-color: {_color_hex_slot(idx, slots, index_filamentos)};")
+                            )
+                            indicadores_color[idx] = indicador
+
+                            selector = TokenSearchSelect(
+                                options=opciones_filamentos,
+                                value=slots[idx] if slots[idx] else None,
+                                label=f"Color {idx + 1}",
+                                with_input=True,
+                                clearable=True,
+                                on_change=lambda e, slot_idx=idx: actualizar_slot(slot_idx, e.value),
+                            ).classes("flex-1 min-w-0")
+
                         slot_selectores.append(selector)
 
-                info_slots = ui.column().classes("w-full gap-1 mt-3")
+                with ui.row().classes("w-full justify-end mt-2"):
+                    boton_guardar_slots_proyecto = ui.button(
+                        "Guardar selecciones en proyecto",
+                        icon="save",
+                    ).props("outline")
 
             with ui.card().classes("w-full max-w-6xl"):
                 ui.label("Edicion rapida por par de colores").classes("text-subtitle1")
@@ -206,14 +281,14 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                     selector_origen = ui.select(opciones_par_inicial, label="Desde", value="1").classes("min-w-44")
                     selector_destino = ui.select(opciones_par_inicial, label="Hacia", value="2").classes("min-w-44")
                     input_par = ui.number(
-                        label="Purga mm3",
+                        label="Purga mmu3",
                         step=1,
                         validation=tool.validar_numero_no_negativo,
                     ).classes("min-w-40")
                     boton_aplicar_par = ui.button("Aplicar", icon="check")
 
             with ui.card().classes("w-full max-w-6xl"):
-                ui.label("Matriz de purga (mm3)").classes("text-subtitle1")
+                ui.label("Matriz de purga (MMU3)").classes("text-subtitle1")
 
                 with ui.grid(columns=6).classes("w-full gap-2 items-center"):
                     ui.label("Desde/Hacia").classes("font-bold")
@@ -275,7 +350,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
 
         def actualizar_opciones_filamentos() -> None:
             nonlocal opciones_filamentos
-            opciones_filamentos = {item["id"]: _texto_filamento_opcion(item) for item in fuente_filamentos}
+            opciones_filamentos = {item["id"]: _opcion_filamento(item) for item in fuente_filamentos}
 
             for idx, selector in enumerate(slot_selectores):
                 opciones_actualizadas = dict(opciones_filamentos)
@@ -284,12 +359,6 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                     opciones_actualizadas[slot_actual] = f"{slot_actual} (no disponible)"
                 selector.set_options(opciones_actualizadas)
                 selector.set_value(slot_actual if slot_actual else None)
-
-        def actualizar_labels_slots() -> None:
-            info_slots.clear()
-            with info_slots:
-                for idx in range(5):
-                    ui.label(_linea_slot(idx, slots, index_filamentos)).classes("text-sm")
 
         def actualizar_encabezados_matriz() -> None:
             for idx in range(1, 6):
@@ -307,10 +376,21 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             if selector_destino.value not in opciones:
                 selector_destino.set_value("2")
 
+        def actualizar_indicadores_color() -> None:
+            for idx, indicador in indicadores_color.items():
+                color = _color_hex_slot(idx, slots, index_filamentos)
+                indicador.style(f"background-color: {color};")
+
+        def actualizar_slot(slot_idx: int, value) -> None:
+            slots[slot_idx] = str(value) if value is not None else ""
+            actualizar_indicadores_color()
+            actualizar_encabezados_matriz()
+            actualizar_selectores_par()
+
         def refrescar_ui_filamentos() -> None:
             actualizar_estado_fuente()
             actualizar_opciones_filamentos()
-            actualizar_labels_slots()
+            actualizar_indicadores_color()
             actualizar_encabezados_matriz()
             actualizar_selectores_par()
             tabla_manual.rows = list(catalogo_manual)
@@ -351,9 +431,13 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 return
 
             SalvarValor(ARCHIVO_PURGA_GLOBAL, "purga_slots", list(slots))
-            SalvarValor(ARCHIVO_PURGA_GLOBAL, "purga_mm3", matriz_guardar)
+            SalvarValor(ARCHIVO_PURGA_GLOBAL, "purga_mmu3", matriz_guardar)
             SalvarValor(ARCHIVO_PURGA_GLOBAL, "catalogo_filamentos", list(catalogo_manual))
             ui.notify("Configuracion de purga guardada en global", type="positive")
+
+        def guardar_slots_en_proyecto() -> None:
+            SalvarValor(tool.archivoInfo, "purga_slots", list(slots), local=False)
+            ui.notify("Selecciones de filamento guardadas en el proyecto", type="positive")
 
         def guardar_en_proyecto() -> None:
             matriz_guardar = leer_matriz_desde_ui()
@@ -361,7 +445,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 return
 
             SalvarValor(tool.archivoInfo, "purga_slots", list(slots), local=False)
-            SalvarValor(tool.archivoInfo, "purga_mm3", matriz_guardar, local=False)
+            SalvarValor(tool.archivoInfo, "purga_mmu3", matriz_guardar, local=False)
             ui.notify("Configuracion de purga guardada en el proyecto", type="positive")
 
         def cargar_global() -> None:
@@ -369,7 +453,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
 
             data = ObtenerArchivo(ARCHIVO_PURGA_GLOBAL) or {}
             slots_global = _normalizar_slots(data.get("purga_slots"))
-            matriz_global = _normalizar_matriz(data.get("purga_mm3"))
+            matriz_global = _normalizar_matriz(data.get("purga_mmu3"))
             catalogo_actualizado = _normalizar_catalogo(data.get("catalogo_filamentos", []))
 
             slots[:] = slots_global
@@ -498,21 +582,11 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 return
 
             inputs_matriz[(origen, destino)].set_value(float(valor))
-            ui.notify(f"Actualizado: {origen} -> {destino} = {valor:.2f} mm3", type="positive")
-
-        for idx, selector in enumerate(slot_selectores):
-            selector.on(
-                "update:model-value",
-                lambda e, slot_idx=idx: (
-                    slots.__setitem__(slot_idx, str(e.args if e.args is not None else "")),
-                    actualizar_labels_slots(),
-                    actualizar_encabezados_matriz(),
-                    actualizar_selectores_par(),
-                ),
-            )
+            ui.notify(f"Actualizado: {origen} -> {destino} = {valor:.2f} mmu3", type="positive")
 
         boton_guardar_global.on_click(guardar_en_global)
         boton_guardar_proyecto.on_click(guardar_en_proyecto)
+        boton_guardar_slots_proyecto.on_click(guardar_slots_en_proyecto)
         boton_cargar_global.on_click(cargar_global)
         boton_recargar_spoolman.on_click(recargar_spoolman)
         boton_agregar_manual.on_click(agregar_manual)
