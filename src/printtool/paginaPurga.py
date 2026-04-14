@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Callable
 from nicegui import ui
 
 from printtool.MiLibrerias import ObtenerArchivo, SalvarValor, ConfigurarLogging
-from printtool.utilidades.miSpoolman import consultarFilamentosSpoolman
+from printtool.utilidades.miSpoolman import consultarFilamentosSpoolman, actualizarPrugaFilamentoSpoolman
 from printtool.utilidades.token_search_select import TokenSearchSelect
 
 if TYPE_CHECKING:
@@ -17,9 +17,9 @@ logger = ConfigurarLogging(__name__)
 ARCHIVO_PURGA_GLOBAL = "data/purga_colores.md"
 
 
-def _matriz_default() -> dict[str, dict[str, float]]:
+def _matriz_default() -> dict[str, dict[str, float | None]]:
     return {
-        str(fila): {str(columna): (0.0 if fila == columna else 80.0) for columna in range(1, 6)}
+        str(fila): {str(columna): (0.0 if fila == columna else None) for columna in range(1, 6)}
         for fila in range(1, 6)
     }
 
@@ -33,7 +33,7 @@ def _normalizar_slots(slots_raw) -> list[str]:
     return slots
 
 
-def _normalizar_matriz(matriz_raw) -> dict[str, dict[str, float]]:
+def _normalizar_matriz(matriz_raw) -> dict[str, dict[str, float | None]]:
     matriz = _matriz_default()
     if not isinstance(matriz_raw, dict):
         return matriz
@@ -48,6 +48,7 @@ def _normalizar_matriz(matriz_raw) -> dict[str, dict[str, float]]:
             columna_key = str(columna)
             valor = fila_data.get(columna_key)
             if valor is None:
+                matriz[fila_key][columna_key] = 0.0 if fila == columna else None
                 continue
             try:
                 valor_num = float(valor)
@@ -184,6 +185,22 @@ def _nombre_slot(slot_idx: int, slots: list[str], index_filamentos: dict[str, di
     return f"Color {slot_idx + 1}"
 
 
+def _texto_slot_par(slot_idx: int, slots: list[str], index_filamentos: dict[str, dict]) -> str:
+    numero = slot_idx + 1
+    slot_id = str(slots[slot_idx] or "").strip()
+
+    if slot_id and slot_id in index_filamentos:
+        nombre = str(index_filamentos[slot_id].get("nombre") or f"Color {numero}")
+        id_corto = slot_id.split("-")[-1] if "-" in slot_id else slot_id
+        return f"Color {numero} | {id_corto} | {nombre}"
+
+    if slot_id:
+        id_corto = slot_id.split("-")[-1] if "-" in slot_id else slot_id
+        return f"Color {numero} | {id_corto} | No disponible"
+
+    return f"Color {numero} | Sin asignar"
+
+
 def _linea_slot(slot_idx: int, slots: list[str], index_filamentos: dict[str, dict]) -> str:
     slot_id = slots[slot_idx]
     if slot_id and slot_id in index_filamentos:
@@ -202,6 +219,75 @@ def _color_hex_slot(slot_idx: int, slots: list[str], index_filamentos: dict[str,
         if color_hex.startswith("#") and len(color_hex) in (4, 7):
             return color_hex
     return "#222222"
+
+
+def _id_corto_filamento(slot_id: str) -> str:
+    slot_id = str(slot_id or "").strip()
+    if slot_id == "":
+        return ""
+
+    id_corto = slot_id.split("-")[-1]
+    return id_corto if id_corto.isdigit() else ""
+
+
+def _parsear_pruga_compacto(valor_pruga: str) -> tuple[dict[str, float], int]:
+    texto = str(valor_pruga or "").strip()
+    if texto == "":
+        return {}, 0
+
+    resultado: dict[str, float] = {}
+    invalidos = 0
+
+    for bloque in texto.replace(",", ".").split("."):
+        token = bloque.strip()
+        if token == "":
+            continue
+
+        if "-" not in token:
+            invalidos += 1
+            continue
+
+        destino_raw, mm3_raw = token.split("-", 1)
+        destino = destino_raw.strip()
+        if not destino.isdigit():
+            invalidos += 1
+            continue
+
+        try:
+            mm3 = float(str(mm3_raw).strip())
+        except (TypeError, ValueError):
+            invalidos += 1
+            continue
+
+        if mm3 < 0:
+            invalidos += 1
+            continue
+
+        resultado[destino] = mm3
+
+    return resultado, invalidos
+
+
+def _formato_mm3_compacto(valor: float) -> str:
+    texto = f"{float(valor):.3f}".rstrip("0").rstrip(".")
+    return texto if texto != "" else "0"
+
+
+def _serializar_pruga_compacto(mapa: dict[str, float]) -> str:
+    pares: list[tuple[int, float]] = []
+    for destino, mm3 in mapa.items():
+        if not str(destino).isdigit():
+            continue
+        try:
+            valor = float(mm3)
+        except (TypeError, ValueError):
+            continue
+        if valor < 0:
+            continue
+        pares.append((int(destino), valor))
+
+    pares.sort(key=lambda item: item[0])
+    return ".".join(f"{destino}-{_formato_mm3_compacto(mm3)}" for destino, mm3 in pares)
 
 
 def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], None], interface: bool) -> None:
@@ -233,7 +319,9 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
         slot_selectores: list = []
         indicadores_color: dict[int, any] = {}
         labels_encabezado: dict[int, any] = {}
+        indicadores_encabezado: dict[int, any] = {}
         labels_fila: dict[int, any] = {}
+        indicadores_fila: dict[int, any] = {}
         inputs_matriz: dict[tuple[int, int], any] = {}
 
         with ui.column().classes("w-full items-center"):
@@ -277,9 +365,11 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             with ui.card().classes("w-full max-w-6xl"):
                 ui.label("Edicion rapida por par de colores").classes("text-subtitle1")
                 with ui.row().classes("items-center w-full gap-3"):
-                    opciones_par_inicial = {str(idx): f"Color {idx}" for idx in range(1, 6)}
-                    selector_origen = ui.select(opciones_par_inicial, label="Desde", value="1").classes("min-w-44")
-                    selector_destino = ui.select(opciones_par_inicial, label="Hacia", value="2").classes("min-w-44")
+                    opciones_par_inicial = {
+                        str(idx): _texto_slot_par(idx - 1, slots, index_filamentos) for idx in range(1, 6)
+                    }
+                    selector_origen = ui.select(opciones_par_inicial, label="Desde", value="1").classes("w-72")
+                    selector_destino = ui.select(opciones_par_inicial, label="Hacia", value="2").classes("w-72")
                     input_par = ui.number(
                         label="Purga mmu3",
                         step=1,
@@ -293,21 +383,32 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 with ui.grid(columns=6).classes("w-full gap-2 items-center"):
                     ui.label("Desde/Hacia").classes("font-bold")
                     for col in range(1, 6):
-                        labels_encabezado[col] = ui.label(f"Color {col}").classes("font-bold text-center")
+                        with ui.row().classes("items-center justify-center gap-2"):
+                            indicadores_encabezado[col] = (
+                                ui.element("div")
+                                .classes("w-4 h-4 rounded border border-gray-500 shrink-0")
+                                .style(f"background-color: {_color_hex_slot(col - 1, slots, index_filamentos)};")
+                            )
+                            labels_encabezado[col] = ui.label(f"Color {col}").classes("font-bold text-center")
 
                     for fila in range(1, 6):
-                        labels_fila[fila] = ui.label(f"Color {fila}").classes("font-bold")
+                        with ui.row().classes("items-center gap-2"):
+                            indicadores_fila[fila] = (
+                                ui.element("div")
+                                .classes("w-4 h-4 rounded border border-gray-500 shrink-0")
+                                .style(f"background-color: {_color_hex_slot(fila - 1, slots, index_filamentos)};")
+                            )
+                            labels_fila[fila] = ui.label(f"Color {fila}").classes("font-bold")
                         for columna in range(1, 6):
                             valor = matriz[str(fila)][str(columna)]
+                            if fila == columna:
+                                ui.element("div").classes("w-28 h-10")
+                                continue
+
                             entrada = ui.number(
                                 value=valor,
                                 step=1,
-                                validation=tool.validar_numero_no_negativo,
                             ).classes("w-28")
-
-                            if fila == columna:
-                                entrada.set_value(0)
-                                entrada.disable()
 
                             inputs_matriz[(fila, columna)] = entrada
 
@@ -363,11 +464,14 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
         def actualizar_encabezados_matriz() -> None:
             for idx in range(1, 6):
                 texto = _nombre_slot(idx - 1, slots, index_filamentos)
+                color = _color_hex_slot(idx - 1, slots, index_filamentos)
                 labels_encabezado[idx].set_text(texto)
+                indicadores_encabezado[idx].style(f"background-color: {color};")
                 labels_fila[idx].set_text(texto)
+                indicadores_fila[idx].style(f"background-color: {color};")
 
         def actualizar_selectores_par() -> None:
-            opciones = {str(idx): _nombre_slot(idx - 1, slots, index_filamentos) for idx in range(1, 6)}
+            opciones = {str(idx): _texto_slot_par(idx - 1, slots, index_filamentos) for idx in range(1, 6)}
             selector_origen.set_options(opciones)
             selector_destino.set_options(opciones)
 
@@ -382,10 +486,16 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 indicador.style(f"background-color: {color};")
 
         def actualizar_slot(slot_idx: int, value) -> None:
+            slot_anterior = slots[slot_idx]
             slots[slot_idx] = str(value) if value is not None else ""
+
+            if slot_anterior and slots[slot_idx] == "":
+                limpiar_matriz_relacionada_slot(slot_idx)
+
             actualizar_indicadores_color()
             actualizar_encabezados_matriz()
             actualizar_selectores_par()
+            cargar_desde_spoolman_si_hay_datos(notificar=False)
 
         def refrescar_ui_filamentos() -> None:
             actualizar_estado_fuente()
@@ -396,7 +506,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             tabla_manual.rows = list(catalogo_manual)
             tabla_manual.update()
 
-        def leer_matriz_desde_ui() -> dict[str, dict[str, float]] | None:
+        def leer_matriz_desde_ui() -> dict[str, dict[str, float | None]] | None:
             resultado = _matriz_default()
             for fila in range(1, 6):
                 for columna in range(1, 6):
@@ -405,6 +515,10 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                         continue
 
                     valor_raw = inputs_matriz[(fila, columna)].value
+                    if valor_raw is None or str(valor_raw).strip() == "":
+                        resultado[str(fila)][str(columna)] = None
+                        continue
+
                     valor = tool.parse_float_seguro(valor_raw)
                     if valor is None or valor < 0:
                         ui.notify(
@@ -415,15 +529,153 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                     resultado[str(fila)][str(columna)] = float(valor)
             return resultado
 
-        def aplicar_matriz_a_ui(matriz_actual: dict[str, dict[str, float]]) -> None:
+        def aplicar_matriz_a_ui(matriz_actual: dict[str, dict[str, float | None]]) -> None:
             for fila in range(1, 6):
                 for columna in range(1, 6):
-                    entrada = inputs_matriz[(fila, columna)]
                     if fila == columna:
-                        entrada.set_value(0)
                         continue
-                    valor = matriz_actual.get(str(fila), {}).get(str(columna), 80.0)
-                    entrada.set_value(float(valor))
+                    entrada = inputs_matriz[(fila, columna)]
+                    valor = matriz_actual.get(str(fila), {}).get(str(columna), None)
+                    if valor is None:
+                        entrada.set_value(None)
+                    else:
+                        entrada.set_value(float(valor))
+
+        def limpiar_matriz_relacionada_slot(slot_idx: int) -> None:
+            fila_columna = slot_idx + 1
+
+            for columna in range(1, 6):
+                if columna == fila_columna:
+                    continue
+                inputs_matriz[(fila_columna, columna)].set_value(None)
+
+            for fila in range(1, 6):
+                if fila == fila_columna:
+                    continue
+                inputs_matriz[(fila, fila_columna)].set_value(None)
+
+        def construir_matriz_desde_pruga_spoolman() -> tuple[dict[str, dict[str, float | None]], int, int]:
+            matriz_spoolman = _matriz_default()
+            celdas_cargadas = 0
+            errores_formato = 0
+
+            for origen_idx in range(5):
+                slot_origen = slots[origen_idx]
+                if slot_origen not in index_filamentos:
+                    continue
+
+                pruga_raw = str(index_filamentos[slot_origen].get("pruga") or "").strip()
+                if pruga_raw == "":
+                    continue
+
+                mapa_origen, errores = _parsear_pruga_compacto(pruga_raw)
+                errores_formato += errores
+
+                for destino_idx in range(5):
+                    if origen_idx == destino_idx:
+                        continue
+
+                    slot_destino = slots[destino_idx]
+                    id_destino = _id_corto_filamento(slot_destino)
+                    if id_destino == "":
+                        continue
+
+                    if id_destino in mapa_origen:
+                        fila = str(origen_idx + 1)
+                        columna = str(destino_idx + 1)
+                        matriz_spoolman[fila][columna] = float(mapa_origen[id_destino])
+                        celdas_cargadas += 1
+
+            return matriz_spoolman, celdas_cargadas, errores_formato
+
+        def cargar_desde_spoolman_si_hay_datos(notificar: bool = False) -> None:
+            if not spoolman_activo:
+                return
+
+            matriz_spoolman, celdas_cargadas, errores_formato = construir_matriz_desde_pruga_spoolman()
+            if celdas_cargadas > 0:
+                aplicar_matriz_a_ui(matriz_spoolman)
+                if notificar:
+                    ui.notify(
+                        f"Matriz actualizada desde Spoolman: {celdas_cargadas} pares de purga",
+                        type="positive",
+                    )
+
+            if errores_formato > 0 and notificar:
+                ui.notify(
+                    "Se encontraron entradas invalidas en el campo pruga de algunos filamentos",
+                    type="warning",
+                )
+
+        def sincronizar_pruga_spoolman(matriz_guardar: dict[str, dict[str, float | None]]) -> None:
+            if not spoolman_activo or not tool.urlSpoolman:
+                return
+
+            total_origenes = 0
+            exitos = 0
+            errores = 0
+
+            for origen_idx in range(5):
+                slot_origen = slots[origen_idx]
+                if slot_origen not in index_filamentos:
+                    continue
+
+                origen_info = index_filamentos[slot_origen]
+                filament_id = origen_info.get("filament_id")
+                try:
+                    filament_id = int(filament_id)
+                except (TypeError, ValueError):
+                    continue
+
+                actualizaciones: dict[str, float] = {}
+                for destino_idx in range(5):
+                    if origen_idx == destino_idx:
+                        continue
+
+                    valor = matriz_guardar[str(origen_idx + 1)][str(destino_idx + 1)]
+                    if valor is None:
+                        continue
+
+                    id_destino = _id_corto_filamento(slots[destino_idx])
+                    if id_destino == "":
+                        continue
+
+                    actualizaciones[id_destino] = float(valor)
+
+                if len(actualizaciones) == 0:
+                    continue
+
+                total_origenes += 1
+
+                mapa_actual, _ = _parsear_pruga_compacto(str(origen_info.get("pruga") or ""))
+                mapa_actual.update(actualizaciones)
+                valor_nuevo = _serializar_pruga_compacto(mapa_actual)
+
+                if valor_nuevo == str(origen_info.get("pruga") or "").strip():
+                    exitos += 1
+                    continue
+
+                guardado = actualizarPrugaFilamentoSpoolman(tool.urlSpoolman, filament_id, valor_nuevo)
+                if guardado:
+                    origen_info["pruga"] = valor_nuevo
+                    exitos += 1
+                else:
+                    errores += 1
+
+            if total_origenes == 0:
+                ui.notify(
+                    "No se enviaron datos a Spoolman (faltan pares origen/destino con filamentos asignados)",
+                    type="warning",
+                )
+                return
+
+            if errores == 0:
+                ui.notify(f"Spoolman sincronizado: {exitos} filamentos actualizados", type="positive")
+            else:
+                ui.notify(
+                    f"Spoolman parcial: {exitos} ok, {errores} con error",
+                    type="warning",
+                )
 
         def guardar_en_global() -> None:
             matriz_guardar = leer_matriz_desde_ui()
@@ -433,6 +685,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             SalvarValor(ARCHIVO_PURGA_GLOBAL, "purga_slots", list(slots))
             SalvarValor(ARCHIVO_PURGA_GLOBAL, "purga_mmu3", matriz_guardar)
             SalvarValor(ARCHIVO_PURGA_GLOBAL, "catalogo_filamentos", list(catalogo_manual))
+            sincronizar_pruga_spoolman(matriz_guardar)
             ui.notify("Configuracion de purga guardada en global", type="positive")
 
         def guardar_slots_en_proyecto() -> None:
@@ -446,6 +699,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
 
             SalvarValor(tool.archivoInfo, "purga_slots", list(slots), local=False)
             SalvarValor(tool.archivoInfo, "purga_mmu3", matriz_guardar, local=False)
+            sincronizar_pruga_spoolman(matriz_guardar)
             ui.notify("Configuracion de purga guardada en el proyecto", type="positive")
 
         def cargar_global() -> None:
@@ -493,6 +747,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 ui.notify("Spoolman no disponible, usando catalogo manual", type="warning")
 
             refrescar_ui_filamentos()
+            cargar_desde_spoolman_si_hay_datos(notificar=True)
 
         def agregar_manual() -> None:
             nonlocal fuente_filamentos, index_filamentos
@@ -549,6 +804,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             for idx in range(5):
                 if slots[idx] == borrar_id:
                     slots[idx] = ""
+                    limpiar_matriz_relacionada_slot(idx)
 
             SalvarValor(ARCHIVO_PURGA_GLOBAL, "catalogo_filamentos", list(catalogo_manual))
 
@@ -595,5 +851,6 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
 
         refrescar_ui_filamentos()
         aplicar_matriz_a_ui(matriz)
+        cargar_desde_spoolman_si_hay_datos(notificar=False)
 
         add_interface(interface, current_page="/purga")
