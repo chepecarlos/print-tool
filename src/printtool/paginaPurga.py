@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Callable
 from nicegui import ui
 
 from printtool.MiLibrerias import ObtenerArchivo, SalvarValor, ConfigurarLogging
+from printtool.utilidades.miOctoprint import consultarFilamentosOctoprint
 from printtool.utilidades.miSpoolman import consultarFilamentosSpoolman, actualizarPrugaFilamentoSpoolman
 from printtool.utilidades.token_search_select import TokenSearchSelect
 
@@ -85,6 +86,88 @@ def _normalizar_catalogo(catalogo_raw) -> list[dict]:
         )
 
     return resultado
+
+
+def _normalizar_maquinas(maquinas_raw) -> list[dict]:
+    if isinstance(maquinas_raw, dict):
+        if isinstance(maquinas_raw.get("maquinas"), list):
+            maquinas_raw = maquinas_raw.get("maquinas")
+        elif isinstance(maquinas_raw.get("impresoras"), list):
+            maquinas_raw = maquinas_raw.get("impresoras")
+
+    if not isinstance(maquinas_raw, list):
+        return []
+
+    resultado: list[dict] = []
+    for idx, item in enumerate(maquinas_raw):
+        if not isinstance(item, dict):
+            continue
+
+        maquina_id = str(item.get("id") or f"maquina-{idx + 1}").strip()
+        nombre = str(item.get("nombre") or item.get("name") or maquina_id).strip()
+        url = str(item.get("url") or item.get("url_octoprint") or "").strip()
+        token = str(
+            item.get("token")
+            or item.get("token_octoprint")
+            or item.get("api_key")
+            or item.get("apiKey")
+            or item.get('token"')
+            or ""
+        ).strip()
+
+        # Tolerancia ante errores de escritura en la clave (ej: token")
+        # o convenciones distintas del usuario.
+        if token == "":
+            for clave_raw, valor_raw in item.items():
+                clave = str(clave_raw).strip().lower().replace(" ", "")
+                if "token" not in clave and "apikey" not in clave:
+                    continue
+                valor = str(valor_raw or "").strip()
+                if valor != "":
+                    token = valor
+                    break
+
+        if url == "":
+            continue
+
+        resultado.append(
+            {
+                "id": maquina_id,
+                "nombre": nombre,
+                "url": url,
+                "token": token,
+                "endpoint_filamentos": str(item.get("endpoint_filamentos") or "/api/settings").strip(),
+                "filamentos_path": str(item.get("filamentos_path") or "").strip(),
+                "slots_path": str(item.get("slots_path") or "").strip(),
+            }
+        )
+
+    return resultado
+
+
+def _resolver_id_slot(id_raw: str, index_filamentos: dict[str, dict]) -> str:
+    candidato = str(id_raw or "").strip()
+    if candidato == "":
+        return ""
+
+    if candidato in index_filamentos:
+        return candidato
+
+    if candidato.isdigit():
+        for prefijo in ("filament-", "spool-"):
+            llave = f"{prefijo}{candidato}"
+            if llave in index_filamentos:
+                return llave
+
+    if "-" in candidato:
+        base = candidato.split("-")[-1]
+        if base.isdigit():
+            for prefijo in ("filament-", "spool-"):
+                llave = f"{prefijo}{base}"
+                if llave in index_filamentos:
+                    return llave
+
+    return ""
 
 
 def _texto_filamento(item: dict) -> str:
@@ -297,11 +380,23 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
     def pagina_purga() -> None:
         data_global = ObtenerArchivo(ARCHIVO_PURGA_GLOBAL) or {}
         data_proyecto = ObtenerArchivo(tool.archivoInfo, False) or {}
+        data_impresoras = ObtenerArchivo("data/impresoras.md") or {}
+        maquinas = _normalizar_maquinas(data_impresoras)
+        maquinas_por_id = {str(item.get("id")): item for item in maquinas}
+
+        maquina_id_guardada = str(data_proyecto.get("purga_maquina_id") or "").strip()
+        maquina_id_inicial = ""
+        if maquina_id_guardada in maquinas_por_id:
+            maquina_id_inicial = maquina_id_guardada
+        elif len(maquinas) > 0:
+            maquina_id_inicial = str(maquinas[0].get("id") or "")
 
         catalogo_manual = _normalizar_catalogo(data_global.get("catalogo_filamentos", []))
 
         filamentos_spoolman = []
         spoolman_activo = False
+        octoprint_activo = False
+        slots_octoprint = ["", "", "", "", ""]
         if tool.urlSpoolman:
             consulta_spoolman = consultarFilamentosSpoolman(tool.urlSpoolman)
             if isinstance(consulta_spoolman, list) and len(consulta_spoolman) > 0:
@@ -345,9 +440,10 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                             )
                             indicadores_color[idx] = indicador
 
+                            valor_slot = slots[idx] if slots[idx] and slots[idx] in opciones_filamentos else None
                             selector = TokenSearchSelect(
                                 options=opciones_filamentos,
-                                value=slots[idx] if slots[idx] else None,
+                                value=valor_slot,
                                 label=f"Color {idx + 1}",
                                 with_input=True,
                                 clearable=True,
@@ -356,11 +452,38 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
 
                         slot_selectores.append(selector)
 
-                with ui.row().classes("w-full justify-end mt-2"):
-                    boton_guardar_slots_proyecto = ui.button(
-                        "Guardar selecciones en proyecto",
-                        icon="save",
-                    ).props("outline")
+                with ui.row().classes("w-full justify-between items-center mt-2 gap-2"):
+                    with ui.row().classes("items-center gap-2"):
+                        opciones_maquinas = {item["id"]: item["nombre"] for item in maquinas}
+                        selector_maquina = ui.select(
+                            opciones_maquinas,
+                            label="Maquina",
+                            value=maquina_id_inicial if maquina_id_inicial else None,
+                        ).classes("w-60")
+
+                        boton_cargar_octoprint = ui.button(
+                            "Cargar filamento desde octoprint",
+                            icon="cloud_download",
+                        ).props("outline")
+                        boton_autocompletar_slots = ui.button(
+                            "Autocompletar Color 1..5",
+                            icon="auto_fix_high",
+                        ).props("outline")
+
+                        if len(opciones_maquinas) == 0:
+                            selector_maquina.disable()
+                            boton_cargar_octoprint.disable()
+                            boton_autocompletar_slots.disable()
+
+                    with ui.row().classes("items-center gap-2"):
+                        boton_guardar_slots_proyecto = ui.button(
+                            "Guardar selecciones en proyecto",
+                            icon="save",
+                        ).props("outline")
+                        boton_limpiar_slots_proyecto = ui.button(
+                            "Limpiar slots del proyecto",
+                            icon="delete_sweep",
+                        ).props("outline color=negative")
 
             with ui.card().classes("w-full max-w-6xl"):
                 ui.label("Edicion rapida por par de colores").classes("text-subtitle1")
@@ -444,7 +567,9 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 boton_borrar_manual = ui.button("Borrar seleccionado", icon="delete").props("color=negative")
 
         def actualizar_estado_fuente() -> None:
-            if spoolman_activo:
+            if octoprint_activo:
+                estado_fuente.set_text(f"Fuente activa: OctoPrint ({len(fuente_filamentos)} filamentos)")
+            elif spoolman_activo:
                 estado_fuente.set_text(f"Fuente activa: Spoolman ({len(fuente_filamentos)} filamentos)")
             else:
                 estado_fuente.set_text(f"Fuente activa: Catalogo manual ({len(catalogo_manual)} filamentos)")
@@ -690,7 +815,19 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
 
         def guardar_slots_en_proyecto() -> None:
             SalvarValor(tool.archivoInfo, "purga_slots", list(slots), local=False)
+            if selector_maquina.value:
+                SalvarValor(tool.archivoInfo, "purga_maquina_id", str(selector_maquina.value), local=False)
             ui.notify("Selecciones de filamento guardadas en el proyecto", type="positive")
+
+        def limpiar_slots_proyecto() -> None:
+            slots[:] = ["", "", "", "", ""]
+            SalvarValor(tool.archivoInfo, "purga_slots", ["", "", "", "", ""], local=False)
+            for selector in slot_selectores:
+                selector.set_value(None)
+            actualizar_indicadores_color()
+            actualizar_encabezados_matriz()
+            actualizar_selectores_par()
+            ui.notify("Slots de filamentos del proyecto limpiados", type="info")
 
         def guardar_en_proyecto() -> None:
             matriz_guardar = leer_matriz_desde_ui()
@@ -716,7 +853,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             catalogo_manual.clear()
             catalogo_manual.extend(catalogo_actualizado)
 
-            if not spoolman_activo:
+            if not spoolman_activo and not octoprint_activo:
                 fuente_filamentos = catalogo_manual
                 index_filamentos = _filamento_por_id(fuente_filamentos)
 
@@ -724,11 +861,12 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             ui.notify("Valores cargados desde la configuracion global", type="info")
 
         def recargar_spoolman() -> None:
-            nonlocal spoolman_activo, fuente_filamentos, index_filamentos
+            nonlocal spoolman_activo, octoprint_activo, fuente_filamentos, index_filamentos
 
             if not tool.urlSpoolman:
                 ui.notify("No hay URL de Spoolman configurada. Use /config.", type="warning")
                 spoolman_activo = False
+                octoprint_activo = False
                 fuente_filamentos = catalogo_manual
                 index_filamentos = _filamento_por_id(fuente_filamentos)
                 refrescar_ui_filamentos()
@@ -737,11 +875,13 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             consulta = consultarFilamentosSpoolman(tool.urlSpoolman)
             if isinstance(consulta, list) and len(consulta) > 0:
                 spoolman_activo = True
+                octoprint_activo = False
                 fuente_filamentos = consulta
                 index_filamentos = _filamento_por_id(fuente_filamentos)
                 ui.notify(f"Spoolman activo: {len(consulta)} filamentos disponibles", type="positive")
             else:
                 spoolman_activo = False
+                octoprint_activo = False
                 fuente_filamentos = catalogo_manual
                 index_filamentos = _filamento_por_id(fuente_filamentos)
                 ui.notify("Spoolman no disponible, usando catalogo manual", type="warning")
@@ -777,7 +917,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             manual_marca.set_value("")
             manual_color.set_value("")
 
-            if not spoolman_activo:
+            if not spoolman_activo and not octoprint_activo:
                 fuente_filamentos = catalogo_manual
                 index_filamentos = _filamento_por_id(fuente_filamentos)
 
@@ -808,7 +948,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
 
             SalvarValor(ARCHIVO_PURGA_GLOBAL, "catalogo_filamentos", list(catalogo_manual))
 
-            if not spoolman_activo:
+            if not spoolman_activo and not octoprint_activo:
                 fuente_filamentos = catalogo_manual
                 index_filamentos = _filamento_por_id(fuente_filamentos)
 
@@ -840,11 +980,84 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             inputs_matriz[(origen, destino)].set_value(float(valor))
             ui.notify(f"Actualizado: {origen} -> {destino} = {valor:.2f} mmu3", type="positive")
 
+        def _maquina_actual() -> dict | None:
+            maquina_id = str(selector_maquina.value or "").strip()
+            if maquina_id == "":
+                return None
+            return maquinas_por_id.get(maquina_id)
+
+        def cargar_filamentos_desde_octoprint() -> None:
+            nonlocal spoolman_activo, octoprint_activo, fuente_filamentos, index_filamentos, slots_octoprint
+
+            maquina = _maquina_actual()
+            if maquina is None:
+                ui.notify("Seleccione una maquina valida", type="warning")
+                return
+
+            consulta = consultarFilamentosOctoprint(maquina)
+            if not consulta.get("ok"):
+                error = str(consulta.get("error") or "No se pudo consultar OctoPrint")
+                ui.notify(error, type="negative")
+                return
+
+            filamentos = consulta.get("filamentos")
+            if not isinstance(filamentos, list) or len(filamentos) == 0:
+                ui.notify("No se encontraron filamentos en la respuesta de OctoPrint", type="warning")
+                return
+
+            spoolman_activo = False
+            octoprint_activo = True
+            fuente_filamentos = filamentos
+            index_filamentos = _filamento_por_id(fuente_filamentos)
+
+            slots_data = consulta.get("slots")
+            if isinstance(slots_data, list) and len(slots_data) == 5:
+                slots_octoprint = [str(item or "") for item in slots_data]
+            else:
+                slots_octoprint = ["", "", "", "", ""]
+
+            SalvarValor(tool.archivoInfo, "purga_maquina_id", maquina["id"], local=False)
+            refrescar_ui_filamentos()
+            ui.notify(f"OctoPrint activo: {len(filamentos)} filamentos disponibles", type="positive")
+
+        def autocompletar_slots_octoprint() -> None:
+            if not octoprint_activo:
+                ui.notify("Primero cargue filamentos desde OctoPrint", type="warning")
+                return
+
+            ids_resueltos = ["", "", "", "", ""]
+            for idx in range(5):
+                ids_resueltos[idx] = _resolver_id_slot(slots_octoprint[idx], index_filamentos)
+
+            if not any(ids_resueltos):
+                ids_ordenados = [str(item.get("id") or "") for item in fuente_filamentos]
+                ids_resueltos = ids_ordenados[:5] + [""] * max(0, 5 - len(ids_ordenados[:5]))
+                ui.notify(
+                    "No se detectaron tools en OctoPrint; se asignaron los primeros filamentos de la lista",
+                    type="warning",
+                )
+
+            for idx in range(5):
+                valor_nuevo = str(ids_resueltos[idx] or "")
+                valor_anterior = slots[idx]
+                slots[idx] = valor_nuevo
+                if valor_anterior and valor_nuevo == "":
+                    limpiar_matriz_relacionada_slot(idx)
+                slot_selectores[idx].set_value(valor_nuevo if valor_nuevo else None)
+
+            actualizar_indicadores_color()
+            actualizar_encabezados_matriz()
+            actualizar_selectores_par()
+            ui.notify("Slots de Color 1..5 actualizados desde la maquina", type="positive")
+
         boton_guardar_global.on_click(guardar_en_global)
         boton_guardar_proyecto.on_click(guardar_en_proyecto)
         boton_guardar_slots_proyecto.on_click(guardar_slots_en_proyecto)
+        boton_limpiar_slots_proyecto.on_click(limpiar_slots_proyecto)
         boton_cargar_global.on_click(cargar_global)
         boton_recargar_spoolman.on_click(recargar_spoolman)
+        boton_cargar_octoprint.on_click(cargar_filamentos_desde_octoprint)
+        boton_autocompletar_slots.on_click(autocompletar_slots_octoprint)
         boton_agregar_manual.on_click(agregar_manual)
         boton_borrar_manual.on_click(borrar_manual)
         boton_aplicar_par.on_click(aplicar_par)

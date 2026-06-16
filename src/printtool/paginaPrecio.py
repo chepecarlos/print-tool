@@ -25,7 +25,7 @@ def cargarPaginaPrecio(tool: "printtool") -> None:
         {
             "referencia": "porcentajeGananciaBase",
             "final": "porcentajeGananciaFinal",
-            "humano": "Porcentaje de Ganancia",
+            "humano": "Margen Ganancia",
             "formato": lambda x: f"{x:.2f} %",
         },
         {
