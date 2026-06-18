@@ -286,13 +286,14 @@ def _texto_slot_par(slot_idx: int, slots: list[str], index_filamentos: dict[str,
     slot_id = str(slots[slot_idx] or "").strip()
 
     if slot_id and slot_id in index_filamentos:
-        nombre = str(index_filamentos[slot_id].get("nombre") or f"Color {numero}")
-        id_corto = slot_id.split("-")[-1] if "-" in slot_id else slot_id
-        return f"Color {numero} | {id_corto} | {nombre}"
+        item = index_filamentos[slot_id]
+        nombre = str(item.get("nombre") or "").strip()
+        marca = str(item.get("marca") or "").strip()
+        texto = " ".join(parte for parte in (nombre, marca) if parte)
+        return texto or f"Color {numero}"
 
     if slot_id:
-        id_corto = slot_id.split("-")[-1] if "-" in slot_id else slot_id
-        return f"Color {numero} | {id_corto} | No disponible"
+        return f"Color {numero} | No disponible"
 
     return f"Color {numero} | Sin asignar"
 
@@ -374,6 +375,17 @@ def _parsear_pruga_compacto(valor_pruga: str) -> tuple[dict[str, float], int]:
 def _formato_mm3_compacto(valor: float) -> str:
     texto = f"{float(valor):.3f}".rstrip("0").rstrip(".")
     return texto if texto != "" else "0"
+
+
+def _validar_numero_no_negativo_opcional(value) -> str | None:
+    if value is None or value == "":
+        return None
+    try:
+        if float(value) < 0:
+            return "No puede ser negativo"
+        return None
+    except (TypeError, ValueError):
+        return "No es un numero valido"
 
 
 def _serializar_pruga_compacto(mapa: dict[str, float]) -> str:
@@ -497,17 +509,31 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
 
             with ui.card().classes("w-full max-w-6xl"):
                 ui.label("Edicion rapida por par de colores").classes("text-subtitle1")
-                with ui.row().classes("items-center w-full gap-3"):
+                with ui.row().classes("items-end w-full gap-3"):
                     opciones_par_inicial = {
                         str(idx): _texto_slot_par(idx - 1, slots, index_filamentos) for idx in range(1, 6)
                     }
-                    selector_origen = ui.select(opciones_par_inicial, label="Desde", value="1").classes("w-72")
-                    selector_destino = ui.select(opciones_par_inicial, label="Hacia", value="2").classes("w-72")
+                    with ui.row().classes("items-center gap-2"):
+                        indicador_par_origen = (
+                            ui.element("div")
+                            .classes("w-8 h-8 rounded border border-gray-500 shrink-0")
+                            .style(f"background-color: {_color_hex_slot(0, slots, index_filamentos)};")
+                        )
+                        selector_origen = ui.select(opciones_par_inicial, label="Desde", value="1").classes("w-64")
+
+                    with ui.row().classes("items-center gap-2"):
+                        indicador_par_destino = (
+                            ui.element("div")
+                            .classes("w-8 h-8 rounded border border-gray-500 shrink-0")
+                            .style(f"background-color: {_color_hex_slot(1, slots, index_filamentos)};")
+                        )
+                        selector_destino = ui.select(opciones_par_inicial, label="Hacia", value="2").classes("w-64")
+
                     input_par = ui.number(
                         label="Purga mmu3",
                         step=1,
-                        validation=tool.validar_numero_no_negativo,
-                    ).classes("min-w-40")
+                        validation=_validar_numero_no_negativo_opcional,
+                    ).classes("min-w-40").props("hide-bottom-space")
                     boton_aplicar_par = ui.button("Aplicar", icon="check")
 
             with ui.card().classes("w-full max-w-6xl"):
@@ -635,6 +661,17 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 labels_fila[idx].set_text(texto)
                 indicadores_fila[idx].style(f"background-color: {color};")
 
+        def actualizar_indicadores_par() -> None:
+            origen = tool.parse_int_seguro(selector_origen.value)
+            if origen is not None and 1 <= origen <= 5:
+                indicador_par_origen.style(f"background-color: {_color_hex_slot(origen - 1, slots, index_filamentos)};")
+
+            destino = tool.parse_int_seguro(selector_destino.value)
+            if destino is not None and 1 <= destino <= 5:
+                indicador_par_destino.style(
+                    f"background-color: {_color_hex_slot(destino - 1, slots, index_filamentos)};"
+                )
+
         def actualizar_selectores_par() -> None:
             opciones = {str(idx): _texto_slot_par(idx - 1, slots, index_filamentos) for idx in range(1, 6)}
             selector_origen.set_options(opciones)
@@ -644,6 +681,9 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 selector_origen.set_value("1")
             if selector_destino.value not in opciones:
                 selector_destino.set_value("2")
+
+            actualizar_indicadores_par()
+            cargar_valor_par_desde_matriz()
 
         def actualizar_indicadores_color() -> None:
             for idx, indicador in indicadores_color.items():
@@ -1073,6 +1113,19 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             inputs_matriz[(origen, destino)].set_value(float(valor))
             ui.notify(f"Actualizado: {origen} -> {destino} = {valor:.2f} mmu3", type="positive")
 
+        def cargar_valor_par_desde_matriz() -> None:
+            origen = tool.parse_int_seguro(selector_origen.value)
+            destino = tool.parse_int_seguro(selector_destino.value)
+
+            if origen is None or destino is None or origen < 1 or origen > 5 or destino < 1 or destino > 5:
+                return
+
+            if origen == destino:
+                input_par.set_value(None)
+                return
+
+            input_par.set_value(inputs_matriz[(origen, destino)].value)
+
         def _maquina_actual() -> dict | None:
             maquina_id = str(selector_maquina.value or "").strip()
             if maquina_id == "":
@@ -1173,6 +1226,13 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
         boton_agregar_manual.on_click(agregar_manual)
         boton_borrar_manual.on_click(borrar_manual)
         boton_aplicar_par.on_click(aplicar_par)
+
+        def manejar_cambio_selector_par() -> None:
+            actualizar_indicadores_par()
+            cargar_valor_par_desde_matriz()
+
+        selector_origen.on_value_change(manejar_cambio_selector_par)
+        selector_destino.on_value_change(manejar_cambio_selector_par)
 
         refrescar_ui_filamentos()
         aplicar_matriz_a_ui(matriz)
