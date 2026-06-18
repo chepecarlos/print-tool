@@ -166,17 +166,26 @@ def _extraer_desde_settings_spoolman(
 ) -> tuple[list[dict], list[str], str | None]:
     config = _config_spoolman_desde_payload(payload_settings)
     if not config:
+        logger.debug("No se encontro config del plugin Spoolman en /api/settings")
         return [], ["", "", "", "", ""], None
+
+    logger.debug(f"Plugin Spoolman detectado | keys={list(config.keys())}")
 
     spoolman_url = str(config.get("spoolmanUrl") or "").strip().rstrip("/")
     if spoolman_url == "":
         logger.debug("Spoolman plugin detectado, pero sin spoolmanUrl")
         return [], ["", "", "", "", ""], None
 
+    logger.debug(f"Spoolman URL configurada en OctoPrint: {spoolman_url}")
+
     selected_spool_ids = config.get("selectedSpoolIds")
     if not isinstance(selected_spool_ids, dict):
-        logger.debug("Spoolman plugin detectado, pero sin selectedSpoolIds valido")
+        logger.debug(
+            f"selectedSpoolIds no es dict | tipo={type(selected_spool_ids)} valor={selected_spool_ids!r}"
+        )
         return [], ["", "", "", "", ""], spoolman_url
+
+    logger.debug(f"selectedSpoolIds recibido: {selected_spool_ids}")
 
     api_key = None
     if bool(config.get("isSpoolmanApiKeyEnabled")):
@@ -186,6 +195,7 @@ def _extraer_desde_settings_spoolman(
     headers_spoolman = {"Accept": "application/json"}
     if api_key and api_key_header:
         headers_spoolman[api_key_header] = api_key
+        logger.debug(f"Spoolman API key activa | header={api_key_header} key={_token_mascarado(api_key)}")
 
     filamentos: list[dict] = []
     ids: set[str] = set()
@@ -193,11 +203,15 @@ def _extraer_desde_settings_spoolman(
 
     for extrusor, spool_data in sorted(selected_spool_ids.items(), key=lambda item: str(item[0])):
         if not isinstance(spool_data, dict):
+            logger.debug(f"  extrusor={extrusor}: spool_data no es dict ({spool_data!r}), saltando")
             continue
 
         spool_id = str(spool_data.get("spoolId") or "").strip()
         if spool_id == "":
+            logger.debug(f"  extrusor={extrusor}: sin spoolId en {spool_data!r}, saltando")
             continue
+
+        logger.debug(f"  extrusor={extrusor} → spool_id={spool_id}")
 
         url_spool = f"{spoolman_url}/api/v1/spool/{spool_id}"
         try:
@@ -206,10 +220,13 @@ def _extraer_desde_settings_spoolman(
             logger.warning(f"No se pudo consultar spool {spool_id} en {url_spool}: {exc}")
             continue
 
+        logger.debug(f"  spool {spool_id} → HTTP {response_spool.status_code}")
+
         if response_spool.status_code != 200:
             logger.warning(
                 "Spoolman devolvio respuesta no valida para spool | "
-                f"status={response_spool.status_code} url={url_spool}"
+                f"status={response_spool.status_code} url={url_spool} "
+                f"body='{_texto_respuesta_seguro(response_spool)}'"
             )
             continue
 
@@ -219,9 +236,19 @@ def _extraer_desde_settings_spoolman(
             logger.warning(f"JSON invalido en respuesta de spool {spool_id} ({url_spool})")
             continue
 
+        logger.debug(
+            f"  spool {spool_id} payload | keys={list(spool_payload.keys()) if isinstance(spool_payload, dict) else type(spool_payload)}"
+        )
+
         filamento = _filamento_desde_spool(spool_payload, len(filamentos) + 1)
         if filamento is None:
+            logger.debug(f"  spool {spool_id}: _filamento_desde_spool retorno None")
             continue
+
+        logger.debug(
+            f"  spool {spool_id} → filamento | id={filamento.get('id')} nombre={filamento.get('nombre')} "
+            f"material={filamento.get('material')} color={filamento.get('color_hex')}"
+        )
 
         filamento_id = str(filamento.get("id") or "").strip()
         if filamento_id and filamento_id not in ids:
@@ -231,10 +258,13 @@ def _extraer_desde_settings_spoolman(
         try:
             idx = int(str(extrusor).strip())
         except (TypeError, ValueError):
+            logger.debug(f"  extrusor={extrusor!r} no es entero, no se puede asignar a slot")
             continue
         if 0 <= idx < 5:
             slots[idx] = filamento_id
+            logger.debug(f"  slot[{idx}] = {filamento_id}")
 
+    logger.debug(f"Spoolman via OctoPrint | filamentos={len(filamentos)} slots={slots}")
     return filamentos, slots, spoolman_url
 
 
@@ -256,12 +286,15 @@ def _extraer_lista_filamentos(payload: dict, maquina: dict) -> list[dict]:
         ]
     )
 
+    logger.debug(f"Buscando filamentos en rutas: {candidatos_paths}")
+
     for ruta in candidatos_paths:
         valor = _valor_path(payload, ruta)
         if not isinstance(valor, list):
+            logger.debug(f"  ruta '{ruta}' -> {type(valor).__name__} (no es lista, saltando)")
             continue
 
-        logger.debug(f"OctoPrint filamentos encontrados en ruta '{ruta}' con {len(valor)} elementos")
+        logger.debug(f"  ruta '{ruta}' -> lista con {len(valor)} elementos")
 
         resultado: list[dict] = []
         ids: set[str] = set()
@@ -276,10 +309,20 @@ def _extraer_lista_filamentos(payload: dict, maquina: dict) -> list[dict]:
                 continue
             ids.add(item_id)
             resultado.append(filamento)
+            logger.debug(
+                f"    [{idx}] id={filamento.get('id')} nombre={filamento.get('nombre')} "
+                f"material={filamento.get('material')} color={filamento.get('color_hex')}"
+            )
 
         if len(resultado) > 0:
+            logger.debug(f"  filamentos validos extraidos de '{ruta}': {len(resultado)}")
             return resultado
 
+        logger.debug(f"  ruta '{ruta}' tenia la lista pero sin filamentos validos")
+
+    logger.debug(
+        f"No se encontraron filamentos en ninguna ruta | keys_payload={list(payload.keys())}"
+    )
     return []
 
 

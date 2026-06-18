@@ -116,6 +116,7 @@ def _parse_filamento_desde_spool(item: dict) -> dict | None:
     return {
         "id": uid,
         "filament_id": int(filament_id) if filament_id is not None else None,
+        "spool_id": int(spool_id) if spool_id is not None else None,
         "nombre": str(nombre),
         "material": str(material),
         "marca": str(marca or ""),
@@ -234,8 +235,7 @@ def consultarFilamentosSpoolman(urlServidor: str, timeout: int = 10) -> list[dic
             logger.warning(f"Formato inesperado de Spoolman en {url}: {type(data)}")
             continue
 
-        filamentos: list[dict] = []
-        ids_agregados: set[str] = set()
+        filamentos_dict: dict[str, dict] = {}
 
         for item in data:
             if not isinstance(item, dict):
@@ -245,12 +245,21 @@ def consultarFilamentosSpoolman(urlServidor: str, timeout: int = 10) -> list[dic
                 continue
 
             item_id = filamento.get("id")
-            if not item_id or item_id in ids_agregados:
+            if not item_id:
                 continue
 
-            ids_agregados.add(item_id)
-            filamentos.append(filamento)
+            if item_id in filamentos_dict:
+                spool_id = filamento.get("spool_id")
+                if spool_id is not None:
+                    spool_ids = filamentos_dict[item_id].setdefault("spool_ids", [])
+                    if spool_id not in spool_ids:
+                        spool_ids.append(spool_id)
+            else:
+                spool_id = filamento.get("spool_id")
+                if spool_id is not None:
+                    filamento["spool_ids"] = [spool_id]
+                filamentos_dict[item_id] = filamento
 
-        return filamentos
+        return list(filamentos_dict.values())
 
     return None

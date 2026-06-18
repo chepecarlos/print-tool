@@ -11,6 +11,7 @@ def Parámetros():
     parser = argparse.ArgumentParser(description="Herramientas para emprendimiento de impresión 3D")
     parser.add_argument("--inventario", "-i", help="Sistema de inventario", action="store_true")
     parser.add_argument("--depuracion", "-d", help="Activa la depuración", action="store_true")
+    return parser.parse_args()
 
 
 def main():

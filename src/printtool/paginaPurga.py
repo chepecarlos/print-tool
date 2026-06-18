@@ -225,6 +225,8 @@ def _opcion_filamento(item: dict) -> dict[str, str | list[str]]:
     """Construye una opcion con etiqueta visible limpia y tokens reales para busqueda."""
     visible = _texto_filamento(item)
     id_filamento = str(item.get("id") or "")
+    filament_id = item.get("filament_id")
+    spool_id = item.get("spool_id")
     nombre = str(item.get("nombre") or "")
     material = str(item.get("material") or "")
     marca = str(item.get("marca") or "")
@@ -242,6 +244,17 @@ def _opcion_filamento(item: dict) -> dict[str, str | list[str]]:
         id_corto = id_filamento.split("-")[-1].strip().lower()
         if id_corto and id_corto not in tokens:
             tokens.append(id_corto)
+
+    # Permitir busqueda por id numerico de filamento y por todos los ids de bobina.
+    if filament_id is not None:
+        token = str(filament_id)
+        if token not in tokens:
+            tokens.append(token)
+
+    for sid in item.get("spool_ids") or ([spool_id] if spool_id is not None else []):
+        token = str(sid)
+        if token not in tokens:
+            tokens.append(token)
 
     for alias in _alias_busqueda_material(material):
         if alias not in tokens:
@@ -321,7 +334,14 @@ def _parsear_pruga_compacto(valor_pruga: str) -> tuple[dict[str, float], int]:
     resultado: dict[str, float] = {}
     invalidos = 0
 
-    for bloque in texto.replace(",", ".").split("."):
+    # Separador actual: coma. Compatibilidad con formato legacy que usaba punto como separador
+    # (solo cuando no hay comas en el string, para no romper decimales tipo "120.5").
+    if "," in texto:
+        bloques = texto.split(",")
+    else:
+        bloques = texto.split(".")
+
+    for bloque in bloques:
         token = bloque.strip()
         if token == "":
             continue
@@ -370,7 +390,7 @@ def _serializar_pruga_compacto(mapa: dict[str, float]) -> str:
         pares.append((int(destino), valor))
 
     pares.sort(key=lambda item: item[0])
-    return ".".join(f"{destino}-{_formato_mm3_compacto(mm3)}" for destino, mm3 in pares)
+    return ",".join(f"{destino}-{_formato_mm3_compacto(mm3)}" for destino, mm3 in pares)
 
 
 def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], None], interface: bool) -> None:
@@ -461,29 +481,19 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                             value=maquina_id_inicial if maquina_id_inicial else None,
                         ).classes("w-60")
 
-                        boton_cargar_octoprint = ui.button(
-                            "Cargar filamento desde octoprint",
-                            icon="cloud_download",
-                        ).props("outline")
-                        boton_autocompletar_slots = ui.button(
-                            "Autocompletar Color 1..5",
-                            icon="auto_fix_high",
-                        ).props("outline")
+                        boton_cargar_octoprint = ui.button(icon="cloud_download").props("outline")
+                        boton_cargar_octoprint.tooltip("Cargar filamento desde OctoPrint")
 
                         if len(opciones_maquinas) == 0:
                             selector_maquina.disable()
                             boton_cargar_octoprint.disable()
-                            boton_autocompletar_slots.disable()
 
                     with ui.row().classes("items-center gap-2"):
-                        boton_guardar_slots_proyecto = ui.button(
-                            "Guardar selecciones en proyecto",
-                            icon="save",
-                        ).props("outline")
-                        boton_limpiar_slots_proyecto = ui.button(
-                            "Limpiar slots del proyecto",
-                            icon="delete_sweep",
-                        ).props("outline color=negative")
+                        boton_guardar_slots_proyecto = ui.button(icon="save").props("outline")
+                        boton_guardar_slots_proyecto.tooltip("Guardar selecciones en proyecto")
+
+                        boton_limpiar_slots_proyecto = ui.button(icon="delete_sweep").props("outline color=negative")
+                        boton_limpiar_slots_proyecto.tooltip("Limpiar slots del proyecto")
 
             with ui.card().classes("w-full max-w-6xl"):
                 ui.label("Edicion rapida por par de colores").classes("text-subtitle1")
@@ -539,6 +549,36 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                     boton_guardar_proyecto = ui.button("Guardar en proyecto", icon="save")
                     boton_guardar_global = ui.button("Guardar global", icon="public")
                     boton_cargar_global = ui.button("Restaurar desde global", icon="download")
+
+            with ui.expansion("Como funciona el campo pruga en Spoolman").classes("w-full max-w-6xl"):
+                with ui.column().classes("gap-3 text-sm"):
+                    ui.markdown(
+                        "**¿Qué es el campo `pruga`?**\n\n"
+                        "Es un campo personalizado (`extra`) que se guarda en cada **Filamento** de Spoolman. "
+                        "Almacena los mm³ de purga que ese color necesita hacia cada uno de los otros colores.\n\n"
+                        "**Formato del valor:**\n\n"
+                        "```\n"
+                        "{id_destino}-{mm3},{id_destino}-{mm3},...\n"
+                        "```\n\n"
+                        "Ejemplo — filamento A necesita 120 mm³ para limpiar hacia B, 80 hacia C y 200 hacia D:\n\n"
+                        "```\n"
+                        "2-120,3-80,4-200\n"
+                        "```\n\n"
+                        "El número antes del guión es el **ID numérico del filamento destino** en Spoolman "
+                        "(no el número de slot). El número después del guión son los **mm³ de purga**.\n\n"
+                        "**¿Dónde vive en Spoolman?**\n\n"
+                        "Se guarda en `filament.extra.pruga`. Spoolman exige que los valores de campos `extra` "
+                        "vengan como JSON serializado, así que en la API el valor viaja así:\n\n"
+                        '```json\n{ "extra": { "pruga": "\\"2-120,3-80,4-200\\"" } }\n```\n\n'
+                        "**¿Cómo se construye la matriz desde aquí?**\n\n"
+                        "Cuando se cargan filamentos, cada slot aporta **su fila** de la matriz: "
+                        "el slot origen lee su `pruga`, busca el ID de cada filamento destino en los otros slots "
+                        "y coloca el mm³ correspondiente en la celda `[origen][destino]`.\n\n"
+                        "**Crear el campo en Spoolman (solo la primera vez):**\n\n"
+                        "1. Ir a `Settings → Custom Fields → Filament`\n"
+                        "2. Crear campo de tipo **Text** con clave exacta `pruga`\n"
+                        "3. PrintTool lo llena automáticamente al guardar."
+                    )
 
             with ui.expansion("Catalogo manual (respaldo cuando Spoolman no esta activo)").classes("w-full max-w-6xl"):
                 ui.label("Filamentos manuales: nombre + material + marca + color").classes("text-sm")
@@ -614,7 +654,15 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             slot_anterior = slots[slot_idx]
             slots[slot_idx] = str(value) if value is not None else ""
 
+            filamento_info = index_filamentos.get(slots[slot_idx]) if slots[slot_idx] else None
+            logger.debug(
+                f"actualizar_slot | slot={slot_idx} (Color {slot_idx + 1}) "
+                f"value_recibido={value!r} anterior={slot_anterior!r} nuevo={slots[slot_idx]!r} "
+                f"filamento={filamento_info.get('nombre') if filamento_info else '(no encontrado en index_filamentos)'}"
+            )
+
             if slot_anterior and slots[slot_idx] == "":
+                logger.debug(f"actualizar_slot | slot={slot_idx} quedo vacio, limpiando fila/columna de la matriz")
                 limpiar_matriz_relacionada_slot(slot_idx)
 
             actualizar_indicadores_color()
@@ -687,14 +735,26 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             for origen_idx in range(5):
                 slot_origen = slots[origen_idx]
                 if slot_origen not in index_filamentos:
+                    logger.debug(
+                        f"construir_matriz_pruga | Color {origen_idx + 1} ({slot_origen!r}) "
+                        "no esta en index_filamentos, saltando como origen"
+                    )
                     continue
 
                 pruga_raw = str(index_filamentos[slot_origen].get("pruga") or "").strip()
+                logger.debug(
+                    f"construir_matriz_pruga | Color {origen_idx + 1} ({slot_origen}) "
+                    f"campo pruga crudo: {pruga_raw!r}"
+                )
                 if pruga_raw == "":
                     continue
 
                 mapa_origen, errores = _parsear_pruga_compacto(pruga_raw)
                 errores_formato += errores
+                logger.debug(
+                    f"construir_matriz_pruga | Color {origen_idx + 1} parseado -> {mapa_origen} "
+                    f"(tokens_invalidos={errores})"
+                )
 
                 for destino_idx in range(5):
                     if origen_idx == destino_idx:
@@ -710,14 +770,28 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                         columna = str(destino_idx + 1)
                         matriz_spoolman[fila][columna] = float(mapa_origen[id_destino])
                         celdas_cargadas += 1
+                        logger.debug(
+                            f"construir_matriz_pruga | [{fila}]->[{columna}] = {mapa_origen[id_destino]} "
+                            f"(id_destino={id_destino})"
+                        )
+                    else:
+                        logger.debug(
+                            f"construir_matriz_pruga | Color {origen_idx + 1} no tiene entrada para "
+                            f"id_destino={id_destino} (Color {destino_idx + 1})"
+                        )
 
             return matriz_spoolman, celdas_cargadas, errores_formato
 
         def cargar_desde_spoolman_si_hay_datos(notificar: bool = False) -> None:
             if not spoolman_activo:
+                logger.debug("cargar_desde_spoolman_si_hay_datos | spoolman_activo=False, no se hace nada")
                 return
 
             matriz_spoolman, celdas_cargadas, errores_formato = construir_matriz_desde_pruga_spoolman()
+            logger.debug(
+                f"cargar_desde_spoolman_si_hay_datos | celdas_cargadas={celdas_cargadas} "
+                f"errores_formato={errores_formato}"
+            )
             if celdas_cargadas > 0:
                 aplicar_matriz_a_ui(matriz_spoolman)
                 if notificar:
@@ -840,7 +914,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             ui.notify("Configuracion de purga guardada en el proyecto", type="positive")
 
         def cargar_global() -> None:
-            nonlocal fuente_filamentos, index_filamentos, spoolman_activo
+            nonlocal fuente_filamentos, index_filamentos
 
             data = ObtenerArchivo(ARCHIVO_PURGA_GLOBAL) or {}
             slots_global = _normalizar_slots(data.get("purga_slots"))
@@ -957,25 +1031,44 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             ui.notify("Filamento eliminado del catalogo manual", type="info")
 
         def aplicar_par() -> None:
+            logger.debug(
+                f"aplicar_par | origen_raw={selector_origen.value!r} "
+                f"destino_raw={selector_destino.value!r} valor_raw={input_par.value!r}"
+            )
+
             origen = tool.parse_int_seguro(selector_origen.value)
             destino = tool.parse_int_seguro(selector_destino.value)
             valor = tool.parse_float_seguro(input_par.value)
 
+            logger.debug(f"aplicar_par | origen={origen} destino={destino} valor={valor}")
+
             if origen is None or destino is None:
+                logger.debug("aplicar_par | origen o destino no validos, cancelando")
                 ui.notify("Seleccione origen y destino validos", type="negative")
                 return
 
             if origen < 1 or origen > 5 or destino < 1 or destino > 5:
+                logger.debug(f"aplicar_par | fuera de rango 1-5: origen={origen} destino={destino}")
                 ui.notify("Origen y destino deben estar entre 1 y 5", type="negative")
                 return
 
             if origen == destino:
+                logger.debug(f"aplicar_par | origen == destino == {origen}, es diagonal, cancelando")
                 ui.notify("No se puede editar la diagonal (siempre 0)", type="warning")
                 return
 
             if valor is None or valor < 0:
+                logger.debug(f"aplicar_par | valor invalido: {valor!r}")
                 ui.notify("Ingrese un valor de purga valido (>= 0)", type="negative")
                 return
+
+            valor_anterior = inputs_matriz[(origen, destino)].value
+            nombre_origen = _nombre_slot(origen - 1, slots, index_filamentos)
+            nombre_destino = _nombre_slot(destino - 1, slots, index_filamentos)
+            logger.debug(
+                f"aplicar_par | [{origen}]{nombre_origen!r} -> [{destino}]{nombre_destino!r} | "
+                f"antes={valor_anterior} ahora={valor:.2f}"
+            )
 
             inputs_matriz[(origen, destino)].set_value(float(valor))
             ui.notify(f"Actualizado: {origen} -> {destino} = {valor:.2f} mmu3", type="positive")
@@ -987,7 +1080,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             return maquinas_por_id.get(maquina_id)
 
         def cargar_filamentos_desde_octoprint() -> None:
-            nonlocal spoolman_activo, octoprint_activo, fuente_filamentos, index_filamentos, slots_octoprint
+            nonlocal octoprint_activo, fuente_filamentos, index_filamentos, slots_octoprint
 
             maquina = _maquina_actual()
             if maquina is None:
@@ -1005,10 +1098,19 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 ui.notify("No se encontraron filamentos en la respuesta de OctoPrint", type="warning")
                 return
 
-            spoolman_activo = False
-            octoprint_activo = True
-            fuente_filamentos = filamentos
+            # No reemplazar fuente_filamentos: se fusiona para conservar las opciones
+            # ya cargadas de Spoolman (incluido el campo `pruga`, que OctoPrint no trae).
+            # OctoPrint solo se usa aqui para saber que filamento va en cada slot.
+            ids_existentes = {str(item.get("id")) for item in fuente_filamentos}
+            nuevos = [item for item in filamentos if str(item.get("id")) not in ids_existentes]
+            fuente_filamentos = list(fuente_filamentos) + nuevos
             index_filamentos = _filamento_por_id(fuente_filamentos)
+            octoprint_activo = True
+
+            logger.debug(
+                f"cargar_filamentos_octoprint | filamentos_octoprint={len(filamentos)} "
+                f"nuevos_agregados={len(nuevos)} total_fuente={len(fuente_filamentos)}"
+            )
 
             slots_data = consulta.get("slots")
             if isinstance(slots_data, list) and len(slots_data) == 5:
@@ -1018,7 +1120,18 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
 
             SalvarValor(tool.archivoInfo, "purga_maquina_id", maquina["id"], local=False)
             refrescar_ui_filamentos()
-            ui.notify(f"OctoPrint activo: {len(filamentos)} filamentos disponibles", type="positive")
+
+            if any(slots_octoprint):
+                autocompletar_slots_octoprint()
+                ui.notify(
+                    f"OctoPrint: slots asignados automaticamente ({len(nuevos)} filamentos nuevos agregados)",
+                    type="positive",
+                )
+            else:
+                ui.notify(
+                    f"OctoPrint consultado: {len(nuevos)} filamentos nuevos agregados, sin slots detectados",
+                    type="warning",
+                )
 
         def autocompletar_slots_octoprint() -> None:
             if not octoprint_activo:
@@ -1057,7 +1170,6 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
         boton_cargar_global.on_click(cargar_global)
         boton_recargar_spoolman.on_click(recargar_spoolman)
         boton_cargar_octoprint.on_click(cargar_filamentos_desde_octoprint)
-        boton_autocompletar_slots.on_click(autocompletar_slots_octoprint)
         boton_agregar_manual.on_click(agregar_manual)
         boton_borrar_manual.on_click(borrar_manual)
         boton_aplicar_par.on_click(aplicar_par)
