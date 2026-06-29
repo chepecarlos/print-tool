@@ -732,26 +732,12 @@ class printtool:
             else:
                 self.multiMaterial = False
 
-            if self.multiMaterial:
-                # Formato de la línea: printer_model=MMU3
-                # filament used [g]=81.79, 17.95, 41.29, 0.00, 0.00
-                buscarGramos = re.search(
-                    r"filament used \[g\]\s*=\s*([0-9.]+), ([0-9.]+), ([0-9.]+), ([0-9.]+), ([0-9.]+)",
-                    lineasDocumento,
-                )
-                if buscarGramos:
-                    infoGcode.material = (
-                        float(buscarGramos.group(1))
-                        + float(buscarGramos.group(2))
-                        + float(buscarGramos.group(3))
-                        + float(buscarGramos.group(4))
-                        + float(buscarGramos.group(5))
-                    )
-            else:
-                buscarGramos = re.search(r"filament used \[g\]\s?=\s?([0-9.]+)", lineasDocumento)
-
-                if buscarGramos:
-                    infoGcode.material = float(buscarGramos.group(1))
+            buscarGramos = re.search(r"filament used \[g\]\s*=\s*([\d., ]+)", lineasDocumento)
+            if buscarGramos:
+                valores = [float(v.strip()) for v in buscarGramos.group(1).split(",") if v.strip()]
+                infoGcode.material = sum(valores)
+                if len(valores) > 1:
+                    self.multiMaterial = True
 
             if infoGcode.material == 0:
                 buscarGramos = re.search(r"(\d+)g", nombre)

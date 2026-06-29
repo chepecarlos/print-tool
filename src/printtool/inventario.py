@@ -1,5 +1,9 @@
 from nicegui import ui
 
+# import multiprocessing
+
+# multiprocessing.set_start_method("spawn", force=True)
+
 from printtool.printtool import printtool
 
 
@@ -65,7 +69,7 @@ class inventario:
                 "field": "precio",
                 "align": "center",
                 "sortable": True,
-                ":format": 'value => "$" + value',
+                ":format": 'value => "{self.símboloMoneda}" + value',
             },
             {
                 "name": "inventario",
@@ -91,7 +95,7 @@ class inventario:
                     "nombre": nombreProyecto,
                     "propiedad": proyectoPrint.propiedadModelo,
                     "tipo": proyectoPrint.tipoModelo,
-                    "precio": proyectoPrint.precioVenta,
+                    "precio": proyectoPrint.precioVentaFinal,
                     "inventario": proyectoPrint.inventario,
                     "ruta": folderProyecto,
                 }
@@ -110,14 +114,12 @@ class inventario:
             # tabla.style("height: 70vh; overflow-y: auto")
 
             with tabla.add_slot("top-right"):
-                with ui.input(placeholder="Search").props("type=search").bind_value(
-                    tabla, "filter"
-                ).add_slot("append"):
+                with (
+                    ui.input(placeholder="Search").props("type=search").bind_value(tabla, "filter").add_slot("append")
+                ):
                     ui.icon("search")
             with tabla.add_slot("top-left"):
-                ui.button(
-                    "Editar", on_click=lambda: self.abrirProyecto(tabla.selected)
-                ).bind_visibility_from(
+                ui.button("Editar", on_click=lambda: self.abrirProyecto(tabla.selected)).bind_visibility_from(
                     tabla, "selected", backward=lambda val: bool(val)
                 )
         self.tablaInfo.update()
@@ -129,8 +131,8 @@ class inventario:
                 ui.label("Creado por ChepeCarlos").classes("text-white")
 
         ui.run(
-            native=True,
-            window_size=(1200, 800),
+            native=False,
+            # window_size=(1200, 800),
             reload=False,
             dark=True,
             language="es",

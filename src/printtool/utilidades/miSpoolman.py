@@ -36,38 +36,38 @@ def _extraer_valor_custom(campo: Any) -> str:
     return valor
 
 
-def _extraer_pruga(item: dict, fallback: dict | None = None) -> str:
+def _extraer_campo_extra(item: dict, claves: tuple[str, ...], fallback: dict | None = None) -> str:
     candidatos: list[Any] = []
 
-    candidatos.append(item.get("pruga"))
-    candidatos.append(item.get("purga"))
+    for clave in claves:
+        candidatos.append(item.get(clave))
 
     extra = item.get("extra")
     if isinstance(extra, dict):
-        candidatos.append(extra.get("pruga"))
-        candidatos.append(extra.get("purga"))
+        for clave in claves:
+            candidatos.append(extra.get(clave))
 
     custom_fields = item.get("custom_fields")
     if isinstance(custom_fields, dict):
-        candidatos.append(custom_fields.get("pruga"))
-        candidatos.append(custom_fields.get("purga"))
+        for clave in claves:
+            candidatos.append(custom_fields.get(clave))
 
     field_values = item.get("field_values")
     if isinstance(field_values, dict):
-        candidatos.append(field_values.get("pruga"))
-        candidatos.append(field_values.get("purga"))
+        for clave in claves:
+            candidatos.append(field_values.get(clave))
 
     if isinstance(field_values, list):
         for field in field_values:
             if not isinstance(field, dict):
                 continue
             key = str(field.get("key") or field.get("name") or "").strip().lower()
-            if key in ("pruga", "purga"):
+            if key in claves:
                 candidatos.append(field.get("value"))
 
     if fallback and isinstance(fallback, dict):
-        candidatos.append(fallback.get("pruga"))
-        candidatos.append(fallback.get("purga"))
+        for clave in claves:
+            candidatos.append(fallback.get(clave))
 
     for candidato in candidatos:
         valor = _extraer_valor_custom(candidato)
@@ -75,6 +75,14 @@ def _extraer_pruga(item: dict, fallback: dict | None = None) -> str:
             return valor
 
     return ""
+
+
+def _extraer_pruga(item: dict, fallback: dict | None = None) -> str:
+    return _extraer_campo_extra(item, ("pruga", "purga"), fallback)
+
+
+def _extraer_pruga_negativa(item: dict, fallback: dict | None = None) -> str:
+    return _extraer_campo_extra(item, ("pruga_negativa", "purga_negativa"), fallback)
 
 
 def _normalizar_color_hex(color: str | None) -> str:
@@ -112,6 +120,7 @@ def _parse_filamento_desde_spool(item: dict) -> dict | None:
 
     color_hex = _normalizar_color_hex(filament.get("color_hex") or item.get("color_hex"))
     pruga = _extraer_pruga(filament, fallback=item)
+    pruga_negativa = _extraer_pruga_negativa(filament, fallback=item)
 
     return {
         "id": uid,
@@ -122,6 +131,7 @@ def _parse_filamento_desde_spool(item: dict) -> dict | None:
         "marca": str(marca or ""),
         "color_hex": color_hex,
         "pruga": pruga,
+        "pruga_negativa": pruga_negativa,
     }
 
 
@@ -141,19 +151,18 @@ def _parse_filamento(item: dict) -> dict | None:
         "marca": str(marca or ""),
         "color_hex": _normalizar_color_hex(item.get("color_hex")),
         "pruga": _extraer_pruga(item),
+        "pruga_negativa": _extraer_pruga_negativa(item),
     }
 
 
-def actualizarPrugaFilamentoSpoolman(
+def _actualizarCampoExtraFilamentoSpoolman(
     urlServidor: str,
     filament_id: int,
-    valor_pruga: str,
+    campo: str,
+    valor: str,
     timeout: int = 10,
 ) -> bool:
-    """Actualizar campo custom `pruga` en un Filament de Spoolman.
-
-    Intenta variantes de payload para mejorar compatibilidad entre versiones.
-    """
+    """Actualizar un campo custom de texto en un Filament de Spoolman."""
 
     if not urlServidor or filament_id <= 0:
         return False
@@ -173,27 +182,49 @@ def actualizarPrugaFilamentoSpoolman(
                 if isinstance(extra_data, dict):
                     extra_actual = dict(extra_data)
     except (requests.RequestException, ValueError) as exc:
-        logger.warning(f"No se pudo leer filament {filament_id} antes de guardar pruga: {exc}")
+        logger.warning(f"No se pudo leer filament {filament_id} antes de guardar {campo}: {exc}")
 
     extra_nuevo = dict(extra_actual)
     # El endpoint de campos extra valida JSON por campo.
     # Para tipo texto, enviar string JSON serializado evita el error 400.
-    extra_nuevo["pruga"] = json.dumps(str(valor_pruga), ensure_ascii=True)
+    extra_nuevo[campo] = json.dumps(str(valor), ensure_ascii=True)
 
     try:
         response = requests.patch(url, json={"extra": extra_nuevo}, timeout=timeout)
     except requests.RequestException as exc:
-        logger.warning(f"Error actualizando pruga en Spoolman ({url}): {exc}")
+        logger.warning(f"Error actualizando {campo} en Spoolman ({url}): {exc}")
         return False
 
     if 200 <= response.status_code < 300:
         return True
 
     logger.warning(
-        "No fue posible actualizar pruga en Spoolman para filament "
+        f"No fue posible actualizar {campo} en Spoolman para filament "
         f"{filament_id}: HTTP {response.status_code} {response.text[:240]}"
     )
     return False
+
+
+def actualizarPrugaFilamentoSpoolman(
+    urlServidor: str,
+    filament_id: int,
+    valor_pruga: str,
+    timeout: int = 10,
+) -> bool:
+    """Actualizar campo custom `pruga` en un Filament de Spoolman."""
+    return _actualizarCampoExtraFilamentoSpoolman(urlServidor, filament_id, "pruga", valor_pruga, timeout)
+
+
+def actualizarPrugaNegativaFilamentoSpoolman(
+    urlServidor: str,
+    filament_id: int,
+    valor_pruga_negativa: str,
+    timeout: int = 10,
+) -> bool:
+    """Actualizar campo custom `pruga_negativa` (intentos fallidos) en un Filament de Spoolman."""
+    return _actualizarCampoExtraFilamentoSpoolman(
+        urlServidor, filament_id, "pruga_negativa", valor_pruga_negativa, timeout
+    )
 
 
 def consultarFilamentosSpoolman(urlServidor: str, timeout: int = 10) -> list[dict] | None:

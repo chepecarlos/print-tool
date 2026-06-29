@@ -7,7 +7,11 @@ from nicegui import ui
 
 from printtool.MiLibrerias import ObtenerArchivo, SalvarValor, ConfigurarLogging
 from printtool.utilidades.miOctoprint import consultarFilamentosOctoprint
-from printtool.utilidades.miSpoolman import consultarFilamentosSpoolman, actualizarPrugaFilamentoSpoolman
+from printtool.utilidades.miSpoolman import (
+    consultarFilamentosSpoolman,
+    actualizarPrugaFilamentoSpoolman,
+    actualizarPrugaNegativaFilamentoSpoolman,
+)
 from printtool.utilidades.token_search_select import TokenSearchSelect
 
 if TYPE_CHECKING:
@@ -372,6 +376,52 @@ def _parsear_pruga_compacto(valor_pruga: str) -> tuple[dict[str, float], int]:
     return resultado, invalidos
 
 
+def _parsear_pruga_negativa_compacto(valor_pruga_negativa: str) -> tuple[dict[str, list[float]], int]:
+    """Igual que `_parsear_pruga_compacto`, pero cada destino puede tener varios intentos
+    fallidos separados por "/", ej: "2-100/130,3-80"."""
+    texto = str(valor_pruga_negativa or "").strip()
+    if texto == "":
+        return {}, 0
+
+    resultado: dict[str, list[float]] = {}
+    invalidos = 0
+
+    for bloque in texto.split(","):
+        token = bloque.strip()
+        if token == "":
+            continue
+
+        if "-" not in token:
+            invalidos += 1
+            continue
+
+        destino_raw, valores_raw = token.split("-", 1)
+        destino = destino_raw.strip()
+        if not destino.isdigit():
+            invalidos += 1
+            continue
+
+        valores: list[float] = []
+        for parte in valores_raw.split("/"):
+            parte = parte.strip()
+            if parte == "":
+                continue
+            try:
+                numero = float(parte)
+            except (TypeError, ValueError):
+                invalidos += 1
+                continue
+            if numero < 0:
+                invalidos += 1
+                continue
+            valores.append(numero)
+
+        if valores:
+            resultado[destino] = valores
+
+    return resultado, invalidos
+
+
 def _formato_mm3_compacto(valor: float) -> str:
     texto = f"{float(valor):.3f}".rstrip("0").rstrip(".")
     return texto if texto != "" else "0"
@@ -403,6 +453,22 @@ def _serializar_pruga_compacto(mapa: dict[str, float]) -> str:
 
     pares.sort(key=lambda item: item[0])
     return ",".join(f"{destino}-{_formato_mm3_compacto(mm3)}" for destino, mm3 in pares)
+
+
+def _serializar_pruga_negativa_compacto(mapa: dict[str, list[float]]) -> str:
+    pares: list[tuple[int, list[float]]] = []
+    for destino, valores in mapa.items():
+        if not str(destino).isdigit():
+            continue
+        limpios = sorted({round(float(valor), 3) for valor in valores if float(valor) >= 0})
+        if not limpios:
+            continue
+        pares.append((int(destino), limpios))
+
+    pares.sort(key=lambda item: item[0])
+    return ",".join(
+        f"{destino}-" + "/".join(_formato_mm3_compacto(valor) for valor in valores) for destino, valores in pares
+    )
 
 
 def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], None], interface: bool) -> None:
@@ -534,7 +600,14 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                         step=1,
                         validation=_validar_numero_no_negativo_opcional,
                     ).classes("min-w-40").props("hide-bottom-space")
+                    input_par_fallo = ui.number(
+                        label="Fallo (mmu3)",
+                        step=1,
+                        validation=_validar_numero_no_negativo_opcional,
+                    ).classes("min-w-40").props("hide-bottom-space")
                     boton_aplicar_par = ui.button("Aplicar", icon="check")
+
+                label_fallidos_par = ui.label("").classes("text-sm text-orange-300")
 
             with ui.card().classes("w-full max-w-6xl"):
                 ui.label("Matriz de purga (MMU3)").classes("text-subtitle1")
@@ -603,7 +676,22 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                         "**Crear el campo en Spoolman (solo la primera vez):**\n\n"
                         "1. Ir a `Settings → Custom Fields → Filament`\n"
                         "2. Crear campo de tipo **Text** con clave exacta `pruga`\n"
-                        "3. PrintTool lo llena automáticamente al guardar."
+                        "3. PrintTool lo llena automáticamente al guardar.\n\n"
+                        "**¿Qué es el campo `pruga_negativa`?**\n\n"
+                        "Guarda los intentos de purga que **fallaron** para ese par de colores, para acotar el "
+                        "rango y encontrar el valor minimo que funciona. Se llena desde el campo "
+                        '"Fallo (mmu3)" en "Edicion rapida por par de colores" y se guarda de inmediato en '
+                        "Spoolman (no requiere boton Guardar).\n\n"
+                        "**Formato del valor:**\n\n"
+                        "```\n"
+                        "{id_destino}-{mm3}/{mm3}/...,{id_destino}-{mm3},...\n"
+                        "```\n\n"
+                        "Cada destino puede acumular varios intentos fallidos separados por `/`. "
+                        "Ejemplo — A fallo con 100 y 130 mm³ hacia B, y con 80 mm³ hacia C:\n\n"
+                        "```\n"
+                        "2-100/130,3-80\n"
+                        "```\n\n"
+                        "Se crea igual que `pruga`, pero con clave exacta `pruga_negativa`."
                     )
 
             with ui.expansion("Catalogo manual (respaldo cuando Spoolman no esta activo)").classes("w-full max-w-6xl"):
@@ -684,6 +772,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
 
             actualizar_indicadores_par()
             cargar_valor_par_desde_matriz()
+            actualizar_label_fallidos_par()
 
         def actualizar_indicadores_color() -> None:
             for idx, indicador in indicadores_color.items():
@@ -1070,17 +1159,66 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             refrescar_ui_filamentos()
             ui.notify("Filamento eliminado del catalogo manual", type="info")
 
+        def registrar_fallo_par(origen: int, destino: int, valor_fallo: float) -> None:
+            slot_origen = slots[origen - 1]
+            origen_info = index_filamentos.get(slot_origen) if slot_origen else None
+            if origen_info is None:
+                ui.notify("El color de origen no tiene un filamento valido asignado", type="warning")
+                return
+
+            if not spoolman_activo or not tool.urlSpoolman:
+                ui.notify(
+                    "Los valores fallidos se guardan en Spoolman (campo pruga_negativa); conecte Spoolman",
+                    type="warning",
+                )
+                return
+
+            filament_id_raw = origen_info.get("filament_id")
+            if filament_id_raw is None:
+                ui.notify("No se pudo identificar el filament_id de Spoolman para el origen", type="negative")
+                return
+            try:
+                filament_id = int(filament_id_raw)
+            except (TypeError, ValueError):
+                ui.notify("No se pudo identificar el filament_id de Spoolman para el origen", type="negative")
+                return
+
+            id_destino = _id_corto_filamento(slots[destino - 1])
+            if id_destino == "":
+                ui.notify("El color de destino no tiene un filamento valido asignado", type="warning")
+                return
+
+            mapa_actual, _ = _parsear_pruga_negativa_compacto(str(origen_info.get("pruga_negativa") or ""))
+            valores_destino = list(mapa_actual.get(id_destino, []))
+            if valor_fallo in valores_destino:
+                ui.notify(
+                    f"Ese valor fallido ya estaba registrado: {origen} -> {destino} = {valor_fallo:.2f} mmu3",
+                    type="info",
+                )
+                return
+
+            valores_destino = sorted(valores_destino + [valor_fallo])
+            mapa_actual[id_destino] = valores_destino
+            valor_nuevo = _serializar_pruga_negativa_compacto(mapa_actual)
+
+            guardado = actualizarPrugaNegativaFilamentoSpoolman(tool.urlSpoolman, filament_id, valor_nuevo)
+            if not guardado:
+                ui.notify("No se pudo guardar el valor fallido en Spoolman", type="negative")
+                return
+
+            origen_info["pruga_negativa"] = valor_nuevo
+            input_par_fallo.set_value(None)
+            ui.notify(f"Fallo registrado: {origen} -> {destino} = {valor_fallo:.2f} mmu3", type="positive")
+
         def aplicar_par() -> None:
             logger.debug(
                 f"aplicar_par | origen_raw={selector_origen.value!r} "
-                f"destino_raw={selector_destino.value!r} valor_raw={input_par.value!r}"
+                f"destino_raw={selector_destino.value!r} valor_raw={input_par.value!r} "
+                f"valor_fallo_raw={input_par_fallo.value!r}"
             )
 
             origen = tool.parse_int_seguro(selector_origen.value)
             destino = tool.parse_int_seguro(selector_destino.value)
-            valor = tool.parse_float_seguro(input_par.value)
-
-            logger.debug(f"aplicar_par | origen={origen} destino={destino} valor={valor}")
 
             if origen is None or destino is None:
                 logger.debug("aplicar_par | origen o destino no validos, cancelando")
@@ -1097,21 +1235,74 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 ui.notify("No se puede editar la diagonal (siempre 0)", type="warning")
                 return
 
-            if valor is None or valor < 0:
-                logger.debug(f"aplicar_par | valor invalido: {valor!r}")
-                ui.notify("Ingrese un valor de purga valido (>= 0)", type="negative")
+            valor: float | None = None
+            if input_par.value is not None and str(input_par.value).strip() != "":
+                valor = tool.parse_float_seguro(input_par.value)
+                if valor is None or valor < 0:
+                    ui.notify("Ingrese un valor de purga valido (>= 0)", type="negative")
+                    return
+
+            valor_fallo: float | None = None
+            if input_par_fallo.value is not None and str(input_par_fallo.value).strip() != "":
+                valor_fallo = tool.parse_float_seguro(input_par_fallo.value)
+                if valor_fallo is None or valor_fallo < 0:
+                    ui.notify("Ingrese un valor de fallo valido (>= 0)", type="negative")
+                    return
+
+            logger.debug(f"aplicar_par | origen={origen} destino={destino} valor={valor} valor_fallo={valor_fallo}")
+
+            if valor is None and valor_fallo is None:
+                ui.notify("Ingrese un valor de purga o un valor fallido", type="negative")
                 return
 
-            valor_anterior = inputs_matriz[(origen, destino)].value
-            nombre_origen = _nombre_slot(origen - 1, slots, index_filamentos)
-            nombre_destino = _nombre_slot(destino - 1, slots, index_filamentos)
-            logger.debug(
-                f"aplicar_par | [{origen}]{nombre_origen!r} -> [{destino}]{nombre_destino!r} | "
-                f"antes={valor_anterior} ahora={valor:.2f}"
-            )
+            if valor is not None:
+                valor_anterior = inputs_matriz[(origen, destino)].value
+                nombre_origen = _nombre_slot(origen - 1, slots, index_filamentos)
+                nombre_destino = _nombre_slot(destino - 1, slots, index_filamentos)
+                logger.debug(
+                    f"aplicar_par | [{origen}]{nombre_origen!r} -> [{destino}]{nombre_destino!r} | "
+                    f"antes={valor_anterior} ahora={valor:.2f}"
+                )
 
-            inputs_matriz[(origen, destino)].set_value(float(valor))
-            ui.notify(f"Actualizado: {origen} -> {destino} = {valor:.2f} mmu3", type="positive")
+                inputs_matriz[(origen, destino)].set_value(float(valor))
+                ui.notify(f"Actualizado: {origen} -> {destino} = {valor:.2f} mmu3", type="positive")
+
+            if valor_fallo is not None:
+                registrar_fallo_par(origen, destino, valor_fallo)
+
+            actualizar_label_fallidos_par()
+
+        def actualizar_label_fallidos_par() -> None:
+            origen = tool.parse_int_seguro(selector_origen.value)
+            destino = tool.parse_int_seguro(selector_destino.value)
+
+            if (
+                origen is None
+                or destino is None
+                or origen == destino
+                or not (1 <= origen <= 5)
+                or not (1 <= destino <= 5)
+            ):
+                label_fallidos_par.set_text("")
+                return
+
+            slot_origen = slots[origen - 1]
+            origen_info = index_filamentos.get(slot_origen) if slot_origen else None
+            id_destino = _id_corto_filamento(slots[destino - 1])
+
+            if origen_info is None or id_destino == "":
+                label_fallidos_par.set_text("")
+                return
+
+            mapa_fallidos, _ = _parsear_pruga_negativa_compacto(str(origen_info.get("pruga_negativa") or ""))
+            valores_fallidos = mapa_fallidos.get(id_destino, [])
+
+            if not valores_fallidos:
+                label_fallidos_par.set_text("")
+                return
+
+            texto_fallidos = ", ".join(_formato_mm3_compacto(valor) for valor in valores_fallidos)
+            label_fallidos_par.set_text(f"Fallidos registrados para este par: {texto_fallidos} mmu3")
 
         def cargar_valor_par_desde_matriz() -> None:
             origen = tool.parse_int_seguro(selector_origen.value)
@@ -1230,6 +1421,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
         def manejar_cambio_selector_par() -> None:
             actualizar_indicadores_par()
             cargar_valor_par_desde_matriz()
+            actualizar_label_fallidos_par()
 
         selector_origen.on_value_change(manejar_cambio_selector_par)
         selector_destino.on_value_change(manejar_cambio_selector_par)

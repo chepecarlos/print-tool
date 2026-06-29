@@ -110,6 +110,7 @@ def _filamento_desde_item(item: dict, fallback_idx: int) -> dict | None:
         "marca": str(marca),
         "color_hex": color_hex,
         "pruga": "",
+        "pruga_negativa": "",
     }
 
 
@@ -157,6 +158,7 @@ def _filamento_desde_spool(spool: dict, fallback_idx: int) -> dict | None:
         "marca": str(vendor.get("name") or ""),
         "color_hex": _normalizar_hex(filament.get("color_hex") or spool.get("color_hex") or ""),
         "pruga": "",
+        "pruga_negativa": "",
     }
 
 
