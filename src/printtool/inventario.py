@@ -41,7 +41,7 @@ class inventario:
                     ui.label(objetoPrintTool.nombreModelo)
                 ui.button(icon="close", on_click=dialog.close).props("flat round dense")
             with ui.element("q-card-section"):
-                objetoPrintTool.cargarGUI(True)
+                objetoPrintTool.cargarGui(True)
 
         dialog.open()
 

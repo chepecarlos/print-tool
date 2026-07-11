@@ -146,10 +146,25 @@ class printtool:
         self.costoTotalImpresion: float = 0
         self.costoExtras: float = 0
 
-    #     @staticmethod
-    #     def esProyecto(folder: str) -> bool:
-    #         "confirma si el proyecto es válido"
-    #         return os.path.exists(os.path.join(folder, "info.md")) and os.path.exists(os.path.join(folder, "extras.md"))
+    @staticmethod
+    def esProyecto(folder: str) -> bool:
+        "confirma si el proyecto es válido"
+        nuevo = os.path.exists(os.path.join(folder, ".printtool", "info.md")) and os.path.exists(
+            os.path.join(folder, ".printtool", "extras.md")
+        )
+        legacy = os.path.exists(os.path.join(folder, "info.md")) and os.path.exists(os.path.join(folder, "extras.md"))
+        return nuevo or legacy
+
+    @staticmethod
+    def buscarProyectos(ruta: str) -> list[str]:
+        """Busca proyectos (carpetas con .printtool/info.md) en la ruta y subcarpetas."""
+
+        proyectos: list[str] = []
+        for carpeta, subcarpetas, _archivos in os.walk(ruta):
+            subcarpetas[:] = [d for d in subcarpetas if not d.startswith(".")]
+            if printtool.esProyecto(carpeta):
+                proyectos.append(carpeta)
+        return proyectos
 
     def iniciarSistema(self) -> None:
 
@@ -560,18 +575,42 @@ class printtool:
         self.calcularCostos()
         self.calculandoPrecioVenta()
 
-    def costosExtras(self):
-        """Cargar y mostrar los costos extras desde el archivo extras.md"""
-        dataCostos = []
-        self.costoExtras = 0
-        self.tablaDataExtras.clear()
+    def calcularCostoExtras(self) -> float:
+        """Sumar los costos extras desde el archivo extras.md (sin tocar la interfaz)."""
 
+        self.costoExtras = 0
         self.infoExtras = ObtenerArchivo(self.archivoExtras, False)
 
         if self.infoExtras is not None:
             for extra in self.infoExtras:
-                dataCostos.append({"extra": extra, "precio": f"{self.símboloMoneda}{self.infoExtras[extra]:.2f}"})
                 self.costoExtras += float(self.infoExtras[extra])
+        return self.costoExtras
+
+    def calcularCostoUnidad(self, recalcularGcode: bool = False) -> float:
+        """Calcular el costo por unidad (sin tocar la interfaz).
+
+        Args:
+            recalcularGcode (bool): Si es True, vuelve a leer los archivos G-code del proyecto
+                en vez de usar los gramos/horas ya guardados en info.md.
+        """
+
+        if recalcularGcode:
+            self.calcularDataArchivos()
+
+        self.calcularCostoExtras()
+        self.calcularCostos()
+        self.calculandoPrecioVenta()
+        return self.costoUnidad
+
+    def costosExtras(self):
+        """Cargar y mostrar los costos extras desde el archivo extras.md"""
+        dataCostos = []
+        self.calcularCostoExtras()
+        self.tablaDataExtras.clear()
+
+        if self.infoExtras is not None:
+            for extra in self.infoExtras:
+                dataCostos.append({"extra": extra, "precio": f"{self.símboloMoneda}{self.infoExtras[extra]:.2f}"})
         dataCostos.append({"extra": "Total", "precio": f"{self.símboloMoneda}{self.costoExtras:.2f}"})
 
         with self.tablaDataExtras as tabla:
@@ -618,8 +657,8 @@ class printtool:
             else:
                 self.porcentajeGananciaFinal = (1 - (self.costoUnidad / self.precioSinIvaFinal)) * 100
 
-    def cargarDataArchivos(self):
-        """Cargar datos de los archivos G-code en la carpeta del proyecto."""
+    def calcularDataArchivos(self) -> list[dict]:
+        """Escanear los archivos G-code del proyecto y calcular gramos/horas totales (sin tocar la interfaz)."""
 
         self.totalGramos = 0
         self.totalHoras = 0
@@ -674,7 +713,19 @@ class printtool:
                 self.totalGramos += materialPorUnidad * infoGcode.copias
                 self.totalHoras += tiempoPorUnidad * infoGcode.copias
 
-        minutosTotal = int((self.totalHoras - int(self.totalHoras)) * 60)
+        if dataArchivo == []:
+            logger.warning("No se encontraron archivos G-code en la carpeta del proyecto.")
+            return dataArchivo
+
+        SalvarValor(self.archivoInfo, "total_gramos", self.totalGramos, local=False)
+        SalvarValor(self.archivoInfo, "total_horas", self.totalHoras, local=False)
+
+        return dataArchivo
+
+    def cargarDataArchivos(self):
+        """Cargar datos de los archivos G-code en la carpeta del proyecto (interfaz)."""
+
+        dataArchivo = self.calcularDataArchivos()
 
         if dataArchivo == []:
             ui.notify(
@@ -682,9 +733,9 @@ class printtool:
                 type="negative",
                 close_button="OK",
             )
-            logger.warning("No se encontraron archivos G-code en la carpeta del proyecto.")
             return
 
+        minutosTotal = int((self.totalHoras - int(self.totalHoras)) * 60)
         dataArchivo.append(
             {
                 "nombre": "Total por unidad",
@@ -693,9 +744,6 @@ class printtool:
                 "tiempo": f"{int(self.totalHoras)}h {minutosTotal}m",
             }
         )
-
-        SalvarValor(self.archivoInfo, "total_gramos", self.totalGramos, local=False)
-        SalvarValor(self.archivoInfo, "total_horas", self.totalHoras, local=False)
 
         self.tablaDataGcode.rows = dataArchivo
         self.tablaDataGcode.update()

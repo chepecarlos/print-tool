@@ -1,4 +1,6 @@
 nicegui>=3.4.0
+typer>=0.15.0
+rich>=13.0.0
 
 python-telegram-bot
 paho-mqtt

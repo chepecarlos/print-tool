@@ -11,6 +11,9 @@ APTPKGS = python3-dev libcairo2-dev libgirepository1.0-dev pkg-config python3-tk
 install:
 	@echo "Instalando Paquete..."
 	pipx install . --force
+	@command -v printtool >/dev/null 2>&1 && printtool --help >/dev/null 2>&1 \
+		&& echo "✓ printtool instalado y disponible en el PATH" \
+		|| (echo "✗ printtool no quedó funcional en el PATH" >&2; exit 1)
 
 # preparar el entorno de sistema (paquetes apt necesarios)
 dependencias:
