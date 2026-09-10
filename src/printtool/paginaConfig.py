@@ -50,7 +50,10 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
 
             if input_filamento.value is not None and input_filamento.value != "":
                 tool.precioFilamento = input_filamento.value
-                _salvar("costo_filamento", tool.precioFilamento)
+                _salvar("precio_filamento", tool.precioFilamento)
+
+            tool.nombreFilamento = input_nombre_filamento.value or ""
+            _salvar("nombre_filamento", tool.nombreFilamento)
 
             data_base = {
                 "url_spoolman": tool.urlSpoolman,
@@ -132,7 +135,9 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
 
                 input_spoolman = ui.input(label="URL del servicio de Spoolman", value=tool.urlSpoolman)
 
-                input_filamento = ui.number(label="Precio Filamento (Si no Spoolman)", value=tool.precioFilamento)
+                input_nombre_filamento = ui.input(label="Nombre Filamento Base", value=tool.nombreFilamento)
+
+                input_filamento = ui.number(label="Precio Filamento x Kg (Si no Spoolman)", value=tool.precioFilamento)
                 input_filamento.props(f"prefix={tool.símboloMoneda}")
 
                 with ui.stepper_navigation():
@@ -175,6 +180,7 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
                 input_tiempo_trabajo,
                 input_consumo,
                 input_spoolman,
+                input_nombre_filamento,
                 input_dolibarr,
                 input_dolibarr_token,
                 input_filamento,

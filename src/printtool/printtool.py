@@ -62,6 +62,15 @@ class printtool:
     "Costo por kilogramos del filamento seleccionado"
     costoGramo: float = 0
 
+    nombreFilamento: str = ""
+    "Nombre del filamento base del sistema"
+    nombreFilamentoProyecto: str = ""
+    "Nombre del filamento específico de este proyecto (vacío = usar el del sistema)"
+    precioFilamentoProyecto: float = 0
+    "Precio por kg del filamento de este proyecto (0 = usar el precio del sistema)"
+    nombreFilamentoActivo: str = ""
+    "Nombre del filamento que se está usando actualmente (proyecto o sistema)"
+
     totalHoras: float = 0
     "Total de horas de la impresión"
 
@@ -191,6 +200,7 @@ class printtool:
 
         self.urlSpoolman = self.infoBase.get("url_spoolman", "")
         self.precioFilamento = self.infoBase.get("precio_filamento", 0)
+        self.nombreFilamento = self.infoBase.get("nombre_filamento", "")
         self.urlDolibarr = self.infoBase.get("url_dolibarr", "")
         self.tokenDolibarr = self.infoBase.get("token_dolibarr", "")
 
@@ -265,6 +275,9 @@ class printtool:
 
         self.costoFilamento = float(self.infoCostos.get("precio_filamento", 0))
 
+        self.nombreFilamentoProyecto = self.infoCostos.get("nombre_filamento", "") or ""
+        self.precioFilamentoProyecto = float(self.infoCostos.get("precio_filamento_kg", 0) or 0)
+
         # self.filamentosDisponibles: list[dict] = self.infoBase.get("filamentos")
 
         # self.filamentoSeleccionado = int(self.infoCostos.get("filamento_seleccionado", 1))
@@ -316,6 +329,11 @@ class printtool:
 
             # separar datos generales de los costos monetarios
             dataTotales = [
+                {
+                    "key": "nombreFilamentoActivo",
+                    "humano": "Filamento",
+                    "formato": lambda x: x if x else "Sistema (sin nombre)",
+                },
                 {"key": "totalGramos", "humano": "Filamento por Unidad", "formato": lambda x: f"{x:.2f}g"},
                 {
                     "key": "totalHoras",
@@ -405,19 +423,24 @@ class printtool:
                             ui.button(on_click=self.actualizarEnsamblado, icon="send")
                             self.textoTiempoEnsamblado.on("keydown.enter", self.actualizarEnsamblado)
 
-                    # if self.urlSpoolman is not None or self.urlSpoolman == "":
-
-                    # self.inputPrecioFilamento = ui.number(label="Precio Filamento", value=)
-
-                    # precioFilamento
-
-                    # if self.filamentosDisponibles is not None:
-                    #     self.selectorFilamento = ui.select(
-                    #         self.listaFilamentos,
-                    #         value=self.filamentoSeleccionado,
-                    #         label="Material",
-                    #         on_change=self.seleccionarFilamento,
-                    #     ).classes("min-w-64")
+                    with ui.column().classes("justify-center items-center"):
+                        with ui.row().props("rounded outlined dense"):
+                            self.inputNombreFilamento = ui.input(
+                                label="Nombre Filamento (Proyecto)",
+                                value=self.nombreFilamentoProyecto,
+                            ).props("rounded outlined dense")
+                            self.inputPrecioFilamento = ui.number(
+                                label="Precio Filamento x Kg (Proyecto)",
+                                value=self.precioFilamentoProyecto or None,
+                                validation=self.validar_numero_opcional_no_negativo,
+                                step=1,
+                            ).props("rounded outlined dense")
+                            self.inputPrecioFilamento.props(f"prefix={self.símboloMoneda}")
+                            ui.button(on_click=self.actualizarFilamentoProyecto, icon="send")
+                            ui.button(on_click=self.borrarFilamentoProyecto, icon="delete").props("flat")
+                        ui.label("Deja el precio vacío o bórralo para usar el filamento del sistema.").classes(
+                            "text-xs text-grey"
+                        )
 
                 infoArchivo = [
                     {
@@ -530,6 +553,17 @@ class printtool:
         except (TypeError, ValueError):
             return "No es un número válido"
 
+    def validar_numero_opcional_no_negativo(self, value):
+        """Validar que el valor, si se ingresa, sea numérico y no negativo. Vacío es válido."""
+        if value is None or value == "":
+            return None
+        try:
+            if float(value) < 0:
+                return "No puede ser negativo"
+            return None
+        except (TypeError, ValueError):
+            return "No es un número válido"
+
     def validar_texto_requerido(self, value):
         if value is None or str(value).strip() == "":
             return "Campo obligatorio"
@@ -565,6 +599,35 @@ class printtool:
         SalvarValor(self.archivoInfo, "tiempo_ensamblaje", self.tiempoEnsamblado, local=False)
         # self.cargarCostos()
         ui.notify(f"Tiempo de ensamblado actualizado a {self.tiempoEnsamblado} minutos")
+
+    def actualizarFilamentoProyecto(self):
+        """Guardar el nombre y precio (por kg) del filamento específico de este proyecto."""
+        precio = self.parse_float_seguro(self.inputPrecioFilamento.value)
+        if precio is not None and precio < 0:
+            ui.notify("Ingrese un precio de filamento válido (>= 0)", type="negative")
+            return
+
+        self.nombreFilamentoProyecto = (self.inputNombreFilamento.value or "").strip()
+        self.precioFilamentoProyecto = precio or 0
+
+        SalvarValor(self.archivoInfo, "nombre_filamento", self.nombreFilamentoProyecto, local=False)
+        SalvarValor(self.archivoInfo, "precio_filamento_kg", self.precioFilamentoProyecto, local=False)
+
+        self.cargarCostos()
+        ui.notify("Filamento del proyecto actualizado")
+
+    def borrarFilamentoProyecto(self):
+        """Quitar el filamento específico del proyecto y volver a usar el del sistema."""
+        self.nombreFilamentoProyecto = ""
+        self.precioFilamentoProyecto = 0
+        self.inputNombreFilamento.value = ""
+        self.inputPrecioFilamento.value = None
+
+        SalvarValor(self.archivoInfo, "nombre_filamento", "", local=False)
+        SalvarValor(self.archivoInfo, "precio_filamento_kg", 0, local=False)
+
+        self.cargarCostos()
+        ui.notify("Se usará el filamento del sistema")
 
     def cargarCostos(self):
         """Cargar y calcular los costos de impresión, ensamblado y extras."""
@@ -856,20 +919,13 @@ class printtool:
         return costoHoraImpresion
 
     def cargarCostoPorGramo(self):
-        """Cargar el costo por gramo del filamento seleccionado"""
+        """Cargar el costo por gramo del filamento, usando el del proyecto si está definido."""
 
-        self.costoGramo = 0
-        self.filamentoSeleccionado = None
+        precioFilamento = self.precioFilamentoProyecto if self.precioFilamentoProyecto > 0 else self.precioFilamento
+        self.nombreFilamentoActivo = self.nombreFilamentoProyecto if self.nombreFilamentoProyecto else self.nombreFilamento
 
-        if self.filamentoSeleccionado is not None:
-            for filamento in self.filamentosDisponibles:
-                id_filamento = filamento.get("id", "")
-                if id_filamento == self.filamentoSeleccionado:
-                    precioFilamento = filamento.get("precio", 0)
-                    self.costoGramo = precioFilamento / 1000
-        else:
-            logger.info(f"Costo Kilogramo de Filamento: {self.precioFilamento}")
-            self.costoGramo = float(self.precioFilamento) / 1000
+        logger.info(f"Costo Kilogramo de Filamento ({self.nombreFilamentoActivo or 'sistema'}): {precioFilamento}")
+        self.costoGramo = float(precioFilamento) / 1000
 
     def calcularCostos(self):
         """Calcular costos"""

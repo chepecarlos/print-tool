@@ -34,11 +34,11 @@ https://pywebview.flowrl.com/guide/installation.html
 
 ## Lectura de información en titulo del archivo
 
-- Piezas: {n}pc
-- Tiempo: {n}h{n}m
-- Gramos: {n}g
-- Copias: {n}cc
-- Color: -{color}-
+- Piezas: {n}pc     Cuantas piezas o repeticiones hay dentro del modelo
+- Tiempo: {n}h{n}m  Tiempo de impresión
+- Gramos: {n}g      Gramos que la impresión
+- Copias: {n}cc     Cuantas veces hay que imprimir el archivo
+- Color: -{color}-  
 - Punta: {n}p
 
 Ejemplo: modelo_32g_5pc_2h10m.gcode
@@ -128,8 +128,8 @@ Al presionar **"Guardar en proyecto"** o **"Guardar global"**:
 
 #### Fuentes de filamentos soportadas
 
-| Fuente | Descripción |
-|--------|-------------|
-| **Spoolman** | Consulta `/api/v1/spool` y lee filamentos con color, material y campo `pruga` |
-| **OctoPrint + Spoolman** | Lee `selectedSpoolIds` de `/api/settings` y consulta cada bobina en Spoolman |
-| **Catálogo manual** | Lista local de filamentos sin conexión a servicios externos |
+| Fuente                   | Descripción                                                                   |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| **Spoolman**             | Consulta `/api/v1/spool` y lee filamentos con color, material y campo `pruga` |
+| **OctoPrint + Spoolman** | Lee `selectedSpoolIds` de `/api/settings` y consulta cada bobina en Spoolman  |
+| **Catálogo manual**      | Lista local de filamentos sin conexión a servicios externos                   |
