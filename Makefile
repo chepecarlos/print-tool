@@ -8,6 +8,9 @@ PACKAGE = src/printtool
 APTPKGS = python3-dev libcairo2-dev libgirepository1.0-dev pkg-config python3-tk
 
 
+test:
+	@pytest
+
 install:
 	@echo "Instalando Paquete..."
 	pipx install . --force

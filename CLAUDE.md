@@ -8,8 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Instalar en modo desarrollo
 pip install -e .
 
+# Instalar con dependencias de test
+pip install -e ".[dev]"
+
 # Ejecutar
 printtool
+
+# Ejecutar tests
+pytest
 
 # Formatear código
 black src/
