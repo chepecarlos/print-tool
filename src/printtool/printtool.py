@@ -46,7 +46,13 @@ class printtool:
     porcentajeInpuesto: float = 13
 
     porcentajeGananciaBase: float = 0
-    "Porcentaje Ganancia de Referencia"
+    "Porcentaje Ganancia sobre la impresión"
+    porcentajeGananciaExtras: float = 15
+    "Porcentaje Ganancia sobre extras (LED, botones, tornillos)"
+    porcentajeGananciaEnsamblado: float = 15
+    "Porcentaje Ganancia sobre ensamblado"
+    porcentajeGananciaReferencia: float = 0
+    "Porcentaje Ganancia combinado de referencia"
     porcentajeGananciaFinal: float = 0
     "Porcentaje Ganancia Final"
 
@@ -255,6 +261,8 @@ class printtool:
         self.costoHoraTrabajo = float(self.infoBase.get("hora_trabajo", 0))
 
         self.porcentajeGananciaBase: float = float(self.infoBase.get("ganancia", 10))
+        self.porcentajeGananciaExtras: float = float(self.infoBase.get("ganancia_extras", 15))
+        self.porcentajeGananciaEnsamblado: float = float(self.infoBase.get("ganancia_ensamblado", 15))
 
         self.nombreModelo = self.infoCostos.get("nombre")
         self.linkModelo = self.infoCostos.get("link")
@@ -703,8 +711,16 @@ class printtool:
 
     def calculandoPrecioVenta(self):
 
-        self.precioSinIvaReferencia = self.costoUnidad / (1 - self.porcentajeGananciaBase / 100)
+        # Cada parte lleva su propio margen: la impresión gana más que lo comprado o la mano de obra
+        self.precioSinIvaReferencia = (
+            self.costoTotalImpresion / (1 - self.porcentajeGananciaBase / 100)
+            + self.costoExtras / (1 - self.porcentajeGananciaExtras / 100)
+            + self.costoEnsamblado / (1 - self.porcentajeGananciaEnsamblado / 100)
+        )
         self.gananciaBase = self.precioSinIvaReferencia - self.costoUnidad
+        self.porcentajeGananciaReferencia = (
+            self.gananciaBase / self.precioSinIvaReferencia * 100 if self.precioSinIvaReferencia else 0
+        )
         self.ivaReferencia = self.precioSinIvaReferencia * self.porcentajeInpuesto / 100
         self.precioVentaReferencia = self.precioSinIvaReferencia + self.ivaReferencia
 

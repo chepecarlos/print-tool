@@ -47,6 +47,8 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
             tool.errorFabricacion = input_merma.value
 
             tool.porcentajeGananciaBase = input_ganancia.value
+            tool.porcentajeGananciaExtras = input_ganancia_extras.value
+            tool.porcentajeGananciaEnsamblado = input_ganancia_ensamblado.value
 
             if input_filamento.value is not None and input_filamento.value != "":
                 tool.precioFilamento = input_filamento.value
@@ -63,6 +65,8 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
                 "costo_electricidad": tool.costoElectricidad,
                 "error_fabricacion": tool.errorFabricacion,
                 "ganancia": tool.porcentajeGananciaBase,
+                "ganancia_extras": tool.porcentajeGananciaExtras,
+                "ganancia_ensamblado": tool.porcentajeGananciaEnsamblado,
             }
 
             data_impresora = {
@@ -163,8 +167,12 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
                     ui.button("Anterior", on_click=pasos.previous).props("flat")
 
             with ui.step("Ganancia"):
-                input_ganancia = ui.number(label="Ganancia", value=tool.porcentajeGananciaBase)
+                input_ganancia = ui.number(label="Ganancia Impresión", value=tool.porcentajeGananciaBase)
                 input_ganancia.props("prefix=%")
+                input_ganancia_extras = ui.number(label="Ganancia Extras", value=tool.porcentajeGananciaExtras)
+                input_ganancia_extras.props("prefix=%")
+                input_ganancia_ensamblado = ui.number(label="Ganancia Ensamblado", value=tool.porcentajeGananciaEnsamblado)
+                input_ganancia_ensamblado.props("prefix=%")
 
                 with ui.stepper_navigation():
                     ui.button("Salvar", on_click=salvar_configuration)
@@ -186,6 +194,8 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
                 input_filamento,
                 input_trabajo,
                 input_ganancia,
+                input_ganancia_extras,
+                input_ganancia_ensamblado,
                 input_merma,
                 input_kwh,
             }
