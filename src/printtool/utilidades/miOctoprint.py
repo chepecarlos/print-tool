@@ -386,7 +386,7 @@ def consultarFilamentosOctoprint(maquina: dict, timeout: int = 10) -> dict[str, 
     endpoint = str(maquina.get("endpoint_filamentos") or "/api/settings").strip()
 
     if url_base == "":
-        return {"ok": False, "error": "La maquina seleccionada no tiene URL configurada"}
+        return {"ok": False, "error": "La máquina seleccionada no tiene URL. Agréguela en data/impresoras.md."}
 
     if not endpoint.startswith("/"):
         endpoint = f"/{endpoint}"
@@ -408,7 +408,7 @@ def consultarFilamentosOctoprint(maquina: dict, timeout: int = 10) -> dict[str, 
         response = requests.get(url, headers=headers, timeout=timeout)
     except requests.RequestException as exc:
         logger.warning(f"No se pudo consultar OctoPrint en {url}: {exc}")
-        return {"ok": False, "error": f"No fue posible conectar a {url}"}
+        return {"ok": False, "error": f"No se pudo conectar con OctoPrint en {url}. Revise que la máquina esté encendida."}
 
     logger.debug(
         "Respuesta OctoPrint | "
@@ -435,18 +435,22 @@ def consultarFilamentosOctoprint(maquina: dict, timeout: int = 10) -> dict[str, 
             )
         return {
             "ok": False,
-            "error": f"OctoPrint devolvio HTTP {response.status_code}",
+            "error": (
+                "OctoPrint rechazó el token: /api/settings necesita un token de administrador."
+                if response.status_code in (401, 403)
+                else f"OctoPrint respondió con error {response.status_code}. Inténtelo de nuevo."
+            ),
         }
 
     try:
         payload = response.json()
     except ValueError:
         logger.warning("OctoPrint devolvio JSON invalido | " f"url={url} body='{_texto_respuesta_seguro(response)}'")
-        return {"ok": False, "error": "OctoPrint devolvio JSON invalido"}
+        return {"ok": False, "error": "OctoPrint devolvió una respuesta que no se pudo leer."}
 
     if not isinstance(payload, dict):
         logger.warning(f"Respuesta inesperada de OctoPrint | tipo={type(payload)} url={url}")
-        return {"ok": False, "error": "Respuesta inesperada de OctoPrint"}
+        return {"ok": False, "error": "OctoPrint devolvió una respuesta inesperada."}
 
     filamentos = _extraer_lista_filamentos(payload, maquina)
     slots = _extraer_slots(payload, maquina)

@@ -23,6 +23,7 @@ from printtool.paginaConfig import registraPaginaConfig
 from printtool.paginaPurga import registraPaginaPurga
 from printtool.paginaActualizar import cargarPaginaActualizar
 from printtool.paginaPrecio import cargarPaginaPrecio
+from printtool.tema import aplicarTema
 
 
 logger = ConfigurarLogging(__name__)
@@ -311,15 +312,15 @@ class printtool:
             {"key": "inventario", "humano": "Inventario", "formato": lambda x: f"{x}"},
             {"key": "skuModelo", "humano": "SKU", "formato": lambda x: f"{x}"},
             # {"key": "Material", "humano": "Material", "formato": "PLA"},
-            {"key": "totalGramos", "humano": "Total Filamento", "formato": lambda x: f"{x:.2f}g"},
+            {"key": "totalGramos", "humano": "Filamento total", "formato": lambda x: f"{x:.2f} g"},
             {
                 "key": "totalHoras",
-                "humano": "Tiempo impresión",
-                "formato": lambda x: f"{int(x)}h {int((x - int(x)) * 60)}m",
+                "humano": "Tiempo de impresión",
+                "formato": lambda x: f"{int(x)} h {int((x - int(x)) * 60)} m",
             },
-            {"key": "precioVentaFinal", "humano": "Precio", "formato": lambda x: f"{self.símboloMoneda} {x:.2f}"},
+            {"key": "precioVentaFinal", "humano": "Precio de venta", "formato": lambda x: f"{self.símboloMoneda} {x:.2f}"},
         ]
-        with ui.grid(columns=2):
+        with ui.grid(columns=2).classes("gap-x-8 gap-y-3"):
 
             for item in dataInfo:
                 ui.label(item["humano"])
@@ -327,132 +328,127 @@ class printtool:
                     self,
                     item["key"],
                     lambda x, transform_func=item["formato"]: transform_func(x),
-                )
+                ).classes("text-right")
 
     def cargarGuiCostos(self) -> None:
         """Cargar la interfaz gráfica de usuario para la pestaña de costos."""
-        with ui.scroll_area() as area:
-            area.classes("w-full h-100 border border-2 border-teal-600h")
-            area.style("height: 75vh")
+        with ui.column() as area:
+            area.classes("w-full max-w-5xl mx-auto px-4")
 
             # separar datos generales de los costos monetarios
             dataTotales = [
                 {
                     "key": "nombreFilamentoActivo",
                     "humano": "Filamento",
-                    "formato": lambda x: x if x else "Sistema (sin nombre)",
+                    "formato": lambda x: x if x else "Predeterminado (sin nombre)",
                 },
-                {"key": "totalGramos", "humano": "Filamento por Unidad", "formato": lambda x: f"{x:.2f}g"},
+                {"key": "totalGramos", "humano": "Filamento por unidad", "formato": lambda x: f"{x:.2f} g"},
                 {
                     "key": "totalHoras",
-                    "humano": "Tiempo Impresión",
-                    "formato": lambda x: f"{int(x)}h {int((x - int(x)) * 60)}m",
+                    "humano": "Tiempo de impresión",
+                    "formato": lambda x: f"{int(x)} h {int((x - int(x)) * 60)} m",
                 },
                 {
                     "key": "tiempoEnsamblado",
-                    "humano": "Tiempo Ensamblaje",
-                    "formato": lambda x: f"{int(x/60)}h {int(x - int(x/60)*60)}m",
+                    "humano": "Tiempo de ensamblaje",
+                    "formato": lambda x: f"{int(x/60)} h {int(x - int(x/60)*60)} m",
                 },
             ]
 
             dataCostos = [
                 {
                     "key": "costoFilamento",
-                    "humano": "Costo de Filamento",
+                    "humano": "Filamento",
                     "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
                 },
                 {
                     "key": "costoEficiencia",
-                    "humano": "Costo por Eficiencia ",
+                    "humano": "Merma",
                     "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
                 },
                 {
                     "key": "costoHoraImpresion",
-                    "humano": "Costo uso maquina",
+                    "humano": "Uso de la impresora",
                     "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
                 },
                 {
                     "key": "costoEnsamblado",
-                    "humano": "Costo ensamblado",
+                    "humano": "Ensamblaje",
                     "formato": lambda x: f"{self.símboloMoneda} {x:.2f}",
                 },
-                {"key": "costoExtras", "humano": "Costo Extras", "formato": lambda x: f"{self.símboloMoneda} {x:.2f}"},
-                {"key": "costoUnidad", "humano": "Costo Total", "formato": lambda x: f"{self.símboloMoneda} {x:.2f}"},
+                {"key": "costoExtras", "humano": "Extras", "formato": lambda x: f"{self.símboloMoneda} {x:.2f}"},
+                {"key": "costoUnidad", "humano": "Costo total", "formato": lambda x: f"{self.símboloMoneda} {x:.2f}"},
             ]
 
             with ui.column().classes("w-full justify-center items-center"):
-                with ui.button("Recargar Costos", on_click=self.cargarCostos).classes("w-64"):
-                    ui.tooltip(
-                        "Al hacer click se recargan los costos de impresión, ensamblado y extras. Útil para actualizar después de hacer cambios en los archivos o en la configuración."
-                    )
+                with ui.button("Calcular costos", on_click=self.cargarCostos).classes("w-64"):
+                    ui.tooltip("Vuelve a leer los G-code, los extras y la configuración, y recalcula.")
 
             with ui.column().bind_visibility_from(self, "mostrarCostos") as panelCostos:
                 panelCostos.classes("w-full justify-center items-center")
 
                 # mostrar ambas tablas en columnas separadas
-                with ui.row().classes("w-full justify-around items-start"):
+                with ui.row().classes("w-full justify-center items-start gap-x-16 gap-y-6"):
                     # izquierda: totales de fabricación
                     with ui.column().classes("justify-center items-center"):
-                        ui.label("Datos de fabricación").classes("font-bold text-center")
+                        ui.label("Datos de fabricación").classes("text-subtitle1").props('role=heading aria-level=2')
                         with ui.grid(columns=2).classes("justify-center items-center"):
                             for item in dataTotales:
-                                ui.label(item["humano"]).classes("text-right pr-4")
+                                ui.label(item["humano"]).classes("pr-6")
                                 ui.label().bind_text_from(
                                     self,
                                     item["key"],
                                     lambda x, transform_func=item["formato"]: transform_func(x),
-                                ).classes("text-left")
+                                ).classes("text-right")
                     # derecha: costos monetarios
                     with ui.column().classes("justify-center items-center"):
-                        ui.label("Costos por Unidad").classes("font-bold text-center")
+                        ui.label("Costos por unidad").classes("text-subtitle1").props('role=heading aria-level=2')
                         with ui.grid(columns=2).classes("justify-center items-center"):
                             for idx, item in enumerate(dataCostos):
                                 is_total = idx == len(dataCostos) - 1  # es el último elemento (Costo Total)
                                 if is_total:
                                     ui.separator().classes("col-span-2 my-2")
-                                ui.label(item["humano"]).classes(
-                                    "text-right pr-4" + (" font-bold text-lg" if is_total else "")
-                                )
+                                ui.label(item["humano"]).classes("pr-6" + (" font-bold text-lg" if is_total else ""))
                                 ui.label().bind_text_from(
                                     self,
                                     item["key"],
                                     lambda x, transform_func=item["formato"]: transform_func(x),
-                                ).classes("text-left" + (" font-bold text-lg text-yellow-400" if is_total else ""))
+                                ).classes("text-right" + (" font-bold text-lg text-ambar-costo" if is_total else ""))
 
                 with ui.row().classes("w-full justify-center items-center"):
                     with ui.column().classes("justify-center items-center"):
-                        with ui.row().props("rounded outlined dense"):
+                        with ui.row().props("outlined dense"):
                             self.textoTiempoEnsamblado = ui.number(
-                                label="Tiempo Ensamblado (Minutos)",
+                                label="Tiempo de ensamblaje",
                                 value=self.tiempoEnsamblado,
                                 validation=self.validar_numero_no_negativo,
                                 step=1,
-                            ).props("rounded outlined dense")
+                            ).props("outlined dense suffix=min")
                             ui.button(on_click=self.actualizarEnsamblado, icon="send").props(
                                 'aria-label="Guardar tiempo de ensamblado"'
                             )
                             self.textoTiempoEnsamblado.on("keydown.enter", self.actualizarEnsamblado)
 
                     with ui.column().classes("justify-center items-center"):
-                        with ui.row().props("rounded outlined dense"):
+                        with ui.row().props("outlined dense"):
                             self.inputNombreFilamento = ui.input(
-                                label="Nombre Filamento (Proyecto)",
+                                label="Filamento del modelo",
                                 value=self.nombreFilamentoProyecto,
-                            ).props("rounded outlined dense")
+                            ).props("outlined dense").classes("w-56")
                             self.inputPrecioFilamento = ui.number(
-                                label="Precio Filamento x Kg (Proyecto)",
+                                label="Precio por kg",
                                 value=self.precioFilamentoProyecto or None,
                                 validation=self.validar_numero_opcional_no_negativo,
                                 step=1,
-                            ).props("rounded outlined dense")
+                            ).props("outlined dense").classes("w-44")
                             self.inputPrecioFilamento.props(f"prefix={self.símboloMoneda}")
                             ui.button(on_click=self.actualizarFilamentoProyecto, icon="send").props(
                                 'aria-label="Guardar filamento del proyecto"'
                             )
                             ui.button(on_click=self.borrarFilamentoProyecto, icon="delete").props(
-                                'flat aria-label="Usar filamento del sistema"'
+                                'flat color=rojo-texto aria-label="Usar el filamento predeterminado"'
                             )
-                        ui.label("Deja el precio vacío o bórralo para usar el filamento del sistema.").classes(
+                        ui.label("Deje el precio vacío para usar el filamento predeterminado (Menú › Configurar).").classes(
                             "text-xs text-grey"
                         )
 
@@ -461,53 +457,44 @@ class printtool:
                         "name": "copias",
                         "label": "Copias",
                         "field": "copias",
-                        "sortable": False,
                     },
                     {
                         "name": "nombre",
-                        "label": "Modelos",
+                        "label": "Archivo",
                         "field": "nombre",
                         "required": True,
-                        "sortable": True,
                         "align": "left",
                     },
                     # {'name': 'archivo', 'label': 'Archivo', 'field': 'archivo'},
                     {
                         "name": "cantidad",
-                        "label": "Cantidad",
+                        "label": "Piezas",
                         "field": "cantidad",
-                        "sortable": False,
                     },
                     {
                         "name": "costo",
                         "label": "Costo",
                         "field": "costo",
-                        "sortable": True,
                     },
                     {
                         "name": "material",
-                        "label": "Material",
+                        "label": "Filamento",
                         "field": "material",
-                        "sortable": True,
                     },
                     {
                         "name": "tiempo",
                         "label": "Tiempo",
                         "field": "tiempo",
-                        "sortable": True,
                     },
-                    {"name": "tipo", "label": "Material", "field": "tipo"},
-                    {"name": "color", "label": "Color", "field": "color"},
                 ]
 
-                with ui.scroll_area().classes("w-full h-100 border border-2 border-teal-600h"):
-                    with ui.row().classes("w-full justify-center items-center"):
-                        self.tablaDataGcode = ui.table(
-                            columns=infoArchivo,
-                            rows=[],
-                            row_key="nombre",
-                            pagination=5,
-                        )
+                # nombres de archivo largos: QTable hace scroll horizontal dentro de sí misma, no la página
+                self.tablaDataGcode = ui.table(
+                    columns=infoArchivo,
+                    rows=[],
+                    row_key="nombre",
+                    pagination=5,
+                ).classes("w-full")
 
                 infoCostos = [
                     {
@@ -606,19 +593,19 @@ class printtool:
     def actualizarEnsamblado(self):
         tiempo = self.parse_float_seguro(self.textoTiempoEnsamblado.value)
         if tiempo is None or tiempo < 0:
-            ui.notify("Ingrese un tiempo de ensamblado valido (>= 0)", type="negative")
+            ui.notify("El tiempo de ensamblaje debe ser un número de minutos mayor o igual a 0.", type="negative")
             return
 
         self.tiempoEnsamblado = tiempo
         SalvarValor(self.archivoInfo, "tiempo_ensamblaje", self.tiempoEnsamblado, local=False)
         # self.cargarCostos()
-        ui.notify(f"Tiempo de ensamblado actualizado a {self.tiempoEnsamblado} minutos")
+        ui.notify(f"Tiempo de ensamblaje guardado: {self.tiempoEnsamblado} min", type="positive")
 
     def actualizarFilamentoProyecto(self):
         """Guardar el nombre y precio (por kg) del filamento específico de este proyecto."""
         precio = self.parse_float_seguro(self.inputPrecioFilamento.value)
         if precio is not None and precio < 0:
-            ui.notify("Ingrese un precio de filamento válido (>= 0)", type="negative")
+            ui.notify("El precio por kg debe ser un número mayor o igual a 0.", type="negative")
             return
 
         self.nombreFilamentoProyecto = (self.inputNombreFilamento.value or "").strip()
@@ -628,7 +615,7 @@ class printtool:
         SalvarValor(self.archivoInfo, "precio_filamento_kg", self.precioFilamentoProyecto, local=False)
 
         self.cargarCostos()
-        ui.notify("Filamento del proyecto actualizado")
+        ui.notify("Filamento de este modelo guardado", type="positive")
 
     def borrarFilamentoProyecto(self):
         """Quitar el filamento específico del proyecto y volver a usar el del sistema."""
@@ -641,7 +628,7 @@ class printtool:
         SalvarValor(self.archivoInfo, "precio_filamento_kg", 0, local=False)
 
         self.cargarCostos()
-        ui.notify("Se usará el filamento del sistema")
+        ui.notify("Este modelo usará el filamento predeterminado", type="positive")
 
     def cargarCostos(self):
         """Cargar y calcular los costos de impresión, ensamblado y extras."""
@@ -687,8 +674,7 @@ class printtool:
 
         if self.infoExtras is not None:
             for extra in self.infoExtras:
-                dataCostos.append({"extra": extra, "precio": f"{self.símboloMoneda}{self.infoExtras[extra]:.2f}"})
-        dataCostos.append({"extra": "Total", "precio": f"{self.símboloMoneda}{self.costoExtras:.2f}"})
+                dataCostos.append({"extra": extra, "precio": f"{self.símboloMoneda} {self.infoExtras[extra]:.2f}"})
 
         with self.tablaDataExtras as tabla:
             with tabla.add_slot("bottom-row"):
@@ -698,20 +684,20 @@ class printtool:
                             'flat fab-mini aria-label="Agregar costo extra"'
                         )
                     with tabla.cell():
-                        self.textoExtra = ui.input("Extra")
+                        self.textoExtra = ui.input("Nuevo extra")
                     with tabla.cell():
                         self.textoCostoExtra = ui.number("Precio")
                 with tabla.add_slot("top-right"):
                     with (
-                        ui.input(placeholder="Search")
+                        ui.input(placeholder="Buscar")
                         .props("type=search")
                         .bind_value(tabla, "filter")
                         .add_slot("append")
                     ):
                         ui.icon("search")
             with tabla.add_slot("top-left"):
-                ui.button(icon="delete", color="red", on_click=self.borrarExtra).props(
-                    'aria-label="Borrar costo extra seleccionado"'
+                ui.button(icon="delete", color="rojo-texto", on_click=self.borrarExtra).props(
+                    'flat aria-label="Borrar costo extra seleccionado"'
                 ).bind_visibility_from(
                     self.tablaDataExtras, "selected", backward=lambda val: bool(val)
                 )
@@ -770,7 +756,7 @@ class printtool:
 
                 if infoGcode.material is None or infoGcode.tiempo is None:
                     logger.warning(f"No se pudo obtener información de {archivo}, saltando...")
-                    ui.notify(f"No se pudo obtener información de {archivo}, saltando...")
+                    ui.notify(f"No se pudo leer {archivo}; se omite del cálculo.", type="warning")
                     continue
 
                 tiempoPorUnidad = infoGcode.tiempo
@@ -784,7 +770,7 @@ class printtool:
 
                 horas = int(tiempoPorUnidad)
                 minutos = int((tiempoPorUnidad - horas) * 60)
-                tiempo_formateado = f"{horas}h {minutos}m"
+                tiempo_formateado = f"{horas} h {minutos} m"
                 infoGcode.costo = (materialPorUnidad * self.costoGramo + tiempoPorUnidad * costoHoraImpresion) * (
                     1 + float(self.errorFabricacion) / 100
                 )
@@ -793,10 +779,10 @@ class printtool:
                         "copias": infoGcode.copias,
                         "nombre": nombreArchivo,
                         "archivo": archivo,
-                        "material": f"{materialPorUnidad:.2f}g",
+                        "material": f"{materialPorUnidad:.2f} g",
                         "tiempo": f"{tiempo_formateado}",
                         "cantidad": infoGcode.cantidad,
-                        "costo": f"$ {infoGcode.costo:.2f}",
+                        "costo": f"{self.símboloMoneda} {infoGcode.costo:.2f}",
                     }
                 )
                 self.totalGramos += materialPorUnidad * infoGcode.copias
@@ -818,9 +804,10 @@ class printtool:
 
         if dataArchivo == []:
             ui.notify(
-                "No se encontraron archivos G-code en la carpeta del proyecto.",
+                "No hay archivos .gcode ni .bgcode en la carpeta del proyecto. "
+                "Lamine el modelo y guarde el G-code en esa carpeta.",
                 type="negative",
-                close_button="OK",
+                close_button="Cerrar",
             )
             return
 
@@ -829,8 +816,8 @@ class printtool:
             {
                 "nombre": "Total por unidad",
                 "archivo": "",
-                "material": f"{self.totalGramos:.2f}g",
-                "tiempo": f"{int(self.totalHoras)}h {minutosTotal}m",
+                "material": f"{self.totalGramos:.2f} g",
+                "tiempo": f"{int(self.totalHoras)} h {minutosTotal} m",
             }
         )
 
@@ -999,9 +986,12 @@ class printtool:
     def borrarExtra(self):
         """Borrar costo extra seleccionado"""
         filaSeleccionada = self.tablaDataExtras.selected
-        if self.infoExtras is not None:
-            id = filaSeleccionada[0].get("extra")
-            del self.infoExtras[id]
+        extra = filaSeleccionada[0].get("extra") if filaSeleccionada else None
+        if not self.infoExtras or extra not in self.infoExtras:
+            ui.notify("Seleccione en la tabla el extra que quiere borrar.", type="warning")
+            return
+        del self.infoExtras[extra]
+        self.tablaDataExtras.selected = []
 
         SalvarArchivo(self.archivoExtras, self.infoExtras)
 
@@ -1013,7 +1003,7 @@ class printtool:
     def actualizarPrecios(self):
         precio = self.parse_float_seguro(self.textoVenta.value)
         if precio is None or precio < 0:
-            ui.notify("Ingrese un precio valido (>= 0)", type="negative")
+            ui.notify("El precio debe ser un número mayor o igual a 0.", type="negative")
             return
 
         self.precioVentaFinal = precio
@@ -1022,22 +1012,32 @@ class printtool:
 
         self.cargarCostos()
 
-        ui.notify(f"Actualizando precios a {self.símboloMoneda}{self.precioVentaFinal:.2f}")
+        ui.notify(f"Precio de venta guardado: {self.símboloMoneda} {self.precioVentaFinal:.2f}", type="positive")
 
     def cargarGuiActualizar(self):
         "Crear interface para actualizar datos del modelo"
         cargarPaginaActualizar(self)
 
     async def buscarFolder(self) -> None:
-        ui.notify("Abriendo selector...", type="info")
+        ui.notify("Abriendo el selector de carpetas…", type="info")
 
         folderBuscado: str = await run.io_bound(seleccionarFolderThinter)
         if folderBuscado:
             self.inputFolder.set_value(folderBuscado)
-            self.folderProyecto = folderBuscado
-            ui.notify(f"Carpeta: {folderBuscado}", type="positive")
         else:
-            ui.notify("Cancelado", type="warning")
+            ui.notify("No se seleccionó ninguna carpeta", type="info")
+
+    def abrirProyecto(self, folder: str) -> None:
+        """Cargar otro proyecto como si la app se abriera en esa carpeta."""
+        if not folder or str(folder) == str(self.folderProyecto):
+            return
+        # ponytail: volver a los valores por defecto de la clase en vez de resetear campo por campo;
+        # los widgets se recrean al recargar la página.
+        vars(self).clear()
+        self.__init__()
+        self.folderProyecto = folder
+        self.iniciarSistema()
+        ui.navigate.reload()
 
     def cargarGui(self, interface: bool = False) -> None:
         """Cargar la interfaz gráfica de usuario.
@@ -1050,9 +1050,9 @@ class printtool:
         def paginaInicio():
 
             with ui.tabs().style("padding: 0px") as tabs:
-                tabs.classes("w-full bg-teal-00 text-white")
+                tabs.classes("w-full text-white")
                 tabs.style("padding: 0px")
-                self.tabInfo = ui.tab("info", icon="home")
+                self.tabInfo = ui.tab("Info", icon="home")
                 self.tabCosto = ui.tab("Costos", icon="view_in_ar")
                 self.tabPrecio = ui.tab("Precio", icon="paid")
                 self.tabData = ui.tab("Modelo", icon="assignment")
@@ -1080,11 +1080,13 @@ class printtool:
 
         def agregarInterface(interface: bool, current_page: str = ""):
 
+            aplicarTema()
+
             if not interface:
                 return
 
             with ui.dialog() as dialog, ui.card().classes("w-full max-w-lg mx-auto q-mt-xl p-4"):
-                ui.label("Seleccionar carpeta de proyecto").classes("text-h6")
+                ui.label("Cambiar proyecto").classes("text-h6").props('role=heading aria-level=2')
 
                 self.inputFolder = (
                     ui.input(
@@ -1095,31 +1097,28 @@ class printtool:
                     .props("readonly")
                 )
 
-                with ui.button_group().props("rounded").classes("bg-teal-00"):
-                    ui.button(
-                        "Buscar",
-                        on_click=self.buscarFolder,
-                    ).props("icon=folder")
-                    ui.button(
-                        "Aceptar",
-                        on_click=dialog.close,
-                    ).props("icon=done")
+                def abrir():
+                    dialog.close()
+                    self.abrirProyecto(self.inputFolder.value)
 
-            async def show():
-                result = await dialog
-                ui.notify(f"You chose {result}")
+                with ui.row().classes("w-full justify-end gap-2"):
+                    ui.button("Elegir carpeta", icon="folder", on_click=self.buscarFolder).props("outline")
+                    ui.button("Abrir proyecto", icon="folder_open", on_click=abrir)
 
-            with ui.header(elevated=True) as cabecera:
-                cabecera.classes("bg-teal-700 items-center justify-between")
-                cabecera.style("height: 5vh; padding: 1px")
-                with ui.row().classes("w-full justify-center items-center"):
-                    ui.label("PrintTool").classes("text-h5")
+            def show():
+                dialog.open()
+
+            with ui.header() as cabecera:
+                cabecera.classes("bg-primary items-center justify-between")
+                cabecera.style("min-height: 48px; padding: 0 8px 0 16px")
+                with ui.row().classes("w-full items-center no-wrap"):
+                    ui.label("PrintTool").classes("text-h5 shrink-0")
                     ui.space()
-                    ui.label(self.nombreModelo).bind_text_from(self, "nombreModelo").classes("text-h6")
+                    ui.label(self.nombreModelo).bind_text_from(self, "nombreModelo").classes("text-h6 truncate min-w-0").props('role=heading aria-level=1')
                     ui.space()
 
                     with ui.button(icon="menu") as botón:
-                        botón.props('color=bg-teal-700 aria-label="Menú"')
+                        botón.props('flat color=white aria-label="Menú"')
                         with ui.menu() as menu:
                             menu.classes("min-w-48 text-center")
 
@@ -1130,7 +1129,7 @@ class printtool:
                                     estilo_menu
                                 ).style("text-align: center;")
 
-                            ui.menu_item("Cambiar Proyecto", on_click=show).classes(estilo_menu).style(
+                            ui.menu_item("Cambiar proyecto", on_click=show).classes(estilo_menu).style(
                                 "text-align: center;"
                             )
 
@@ -1140,18 +1139,18 @@ class printtool:
                                 ).style("text-align: center;")
 
                             if current_page != "/purga":
-                                ui.menu_item("Calculo Purga MMU", on_click=lambda: ui.navigate.to("/purga")).classes(
+                                ui.menu_item("Calculadora de purga MMU", on_click=lambda: ui.navigate.to("/purga")).classes(
                                     estilo_menu
                                 ).style("text-align: center;")
 
                             ui.separator()
-                            ui.menu_item("Salir", on_click=app.shutdown).classes(f"{estilo_menu} text-red-500").style(
+                            ui.menu_item("Salir", on_click=app.shutdown).classes(f"{estilo_menu} text-rojo-texto").style(
                                 "text-align: center;"
                             )
 
             with ui.footer() as pie:
-                pie.classes("bg-teal-700")
-                pie.style("height: 5vh; padding: 1px")
+                pie.classes("bg-primary")
+                pie.style("min-height: 32px; padding: 4px 16px")
                 with ui.row().classes("w-full justify-center items-center"):
                     ui.label("Creado por ChepeCarlos").classes("text-white")
 

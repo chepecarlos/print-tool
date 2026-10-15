@@ -39,15 +39,17 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
 
     @ui.page("/config")
     def pagina_configurar():
-        def salvar_simbolo() -> None:
+        def guardar_simbolo() -> None:
             simbolo = (input_simbolo.value or "").strip()
             if simbolo != "" and simbolo != tool.símboloMoneda:
                 tool.símboloMoneda = simbolo
                 SalvarValor(tool.archivoConfig, "simbolo", simbolo)
                 ui.notify(f"Símbolo de moneda guardado: {simbolo}", type="positive")
-                input_costo_impresora.props(f"prefix={tool.símboloMoneda}")
-                input_envio_impresora.props(f"prefix={tool.símboloMoneda}")
+                for entrada in entradas_moneda:
+                    entrada.props(f"prefix={simbolo}")
 
+        def siguiente_basico() -> None:
+            guardar_simbolo()
             pasos.next()
 
         def salvar_configuration() -> None:
@@ -56,6 +58,8 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
                 nombres = ", ".join(entrada.props["label"] for entrada in invalidos)
                 ui.notify(f"No se guardó. Corrija: {nombres}", type="negative", multi_line=True)
                 return
+
+            guardar_simbolo()
 
             def _salvar(campo: str, valor) -> None:
                 SalvarValor(tool.archivoConfig, campo, valor)
@@ -117,78 +121,74 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
 
             ui.notify("Configuración guardada", type="positive")
 
-        with ui.stepper().props("vertical").classes("w-full") as pasos:
-            pasos.classes("bg-teal-00")
-
-            with ui.step("Basico").classes("bg-teal-00"):
-                input_simbolo = ui.input(label="Simbolo Modena", value=tool.símboloMoneda)
-                input_nombre = ui.input(label="Nombre Impresora", value=tool.infoImpresora.nombre)
+        with ui.stepper().props("vertical header-nav").classes("w-full") as pasos:
+            with ui.step("Básico"):
+                input_simbolo = ui.input(label="Símbolo de moneda", value=tool.símboloMoneda)
+                input_nombre = ui.input(label="Nombre de la impresora", value=tool.infoImpresora.nombre)
 
                 with ui.stepper_navigation():
-                    ui.button("Siguiente", on_click=salvar_simbolo)
+                    ui.button("Siguiente", on_click=siguiente_basico)
 
             with ui.step("Impresora"):
-                input_costo_impresora = ui.number(label="Costo Impresora", value=tool.infoImpresora.costo, step=1, validation=tool.validar_numero_no_negativo)
+                input_costo_impresora = ui.number(label="Precio de la impresora", value=tool.infoImpresora.costo, step=1, validation=tool.validar_numero_no_negativo)
                 input_costo_impresora.props(f"prefix={tool.símboloMoneda}")
 
-                input_envio_impresora = ui.number(label="Envio Impresora", value=tool.infoImpresora.envio, validation=tool.validar_numero_no_negativo)
+                input_envio_impresora = ui.number(label="Envío de la impresora", value=tool.infoImpresora.envio, validation=tool.validar_numero_no_negativo)
                 input_envio_impresora.props(f"prefix={tool.símboloMoneda}")
 
-                input_mantenimiento = ui.number(label="Mantenimiento Anual", value=tool.infoImpresora.mantenimiento, validation=tool.validar_numero_no_negativo)
+                input_mantenimiento = ui.number(label="Mantenimiento anual", value=tool.infoImpresora.mantenimiento, validation=tool.validar_numero_no_negativo)
                 input_mantenimiento.props(f"prefix={tool.símboloMoneda}")
 
-                input_vida_util = ui.number(label="Vida util", value=tool.infoImpresora.vidaUtil, validation=lambda v: _validar_positivo(tool, v))
-                input_vida_util.props("suffix=anos")
+                input_vida_util = ui.number(label="Vida útil", value=tool.infoImpresora.vidaUtil, validation=lambda v: _validar_positivo(tool, v))
+                input_vida_util.props("suffix=años")
 
-                input_tiempo_trabajo = ui.number(label="Tiempo Trabajo", value=tool.infoImpresora.tiempoTrabajo, validation=lambda v: _validar_porcentaje_uso(tool, v))
-                input_tiempo_trabajo.props("prefix=%")
+                input_tiempo_trabajo = ui.number(label="Uso de la impresora", value=tool.infoImpresora.tiempoTrabajo, validation=lambda v: _validar_porcentaje_uso(tool, v))
+                input_tiempo_trabajo.props('suffix="% del año" hint="Horas al año que imprime, en %. Reparte el costo de la impresora."')
 
-                input_consumo = ui.number(label="Consumo", value=tool.infoImpresora.consumo, validation=tool.validar_numero_no_negativo)
-                input_consumo.props("suffix=watts")
+                input_consumo = ui.number(label="Consumo eléctrico", value=tool.infoImpresora.consumo, validation=tool.validar_numero_no_negativo)
+                input_consumo.props("suffix=W")
 
                 with ui.stepper_navigation():
                     ui.button("Siguiente", on_click=pasos.next)
                     ui.button("Anterior", on_click=pasos.previous).props("flat")
 
-            with ui.step("Ensamblaje"):
-                input_trabajo = ui.number(label="Hora trabajo", value=tool.costoHoraTrabajo, validation=tool.validar_numero_no_negativo)
+            with ui.step("Operación"):
+                input_trabajo = ui.number(label="Costo por hora de trabajo", value=tool.costoHoraTrabajo, validation=tool.validar_numero_no_negativo)
                 input_trabajo.props(f"prefix={tool.símboloMoneda}")
 
-                input_kwh = ui.number(label="Costo kWh", value=tool.costoElectricidad, validation=tool.validar_numero_no_negativo)
+                input_kwh = ui.number(label="Costo del kWh", value=tool.costoElectricidad, validation=tool.validar_numero_no_negativo)
                 input_kwh.props(f"prefix={tool.símboloMoneda}")
 
-                input_merma = ui.number(label="Merma en Fabricacion", value=tool.errorFabricacion, validation=tool.validar_numero_no_negativo)
-                input_merma.props("prefix=%")
-                with input_merma:
-                    ui.tooltip("")
+                input_merma = ui.number(label="Merma de fabricación", value=tool.errorFabricacion, validation=tool.validar_numero_no_negativo)
+                input_merma.props('suffix=% hint="Filamento extra por impresiones fallidas; se suma como costo de merma."')
 
                 with ui.stepper_navigation():
                     ui.button("Siguiente", on_click=pasos.next)
                     ui.button("Anterior", on_click=pasos.previous).props("flat")
 
-            with ui.step("Spoolman"):
-                ui.label("Coleccion con API de filamento")
+            with ui.step("Filamento"):
+                ui.label("Precio predeterminado del filamento y conexión con Spoolman.")
 
-                input_spoolman = ui.input(label="URL del servicio de Spoolman", value=tool.urlSpoolman)
+                input_spoolman = ui.input(label="URL de Spoolman (para la purga)", value=tool.urlSpoolman)
 
-                input_nombre_filamento = ui.input(label="Nombre Filamento Base", value=tool.nombreFilamento)
+                input_nombre_filamento = ui.input(label="Nombre del filamento predeterminado", value=tool.nombreFilamento)
 
-                input_filamento = ui.number(label="Precio Filamento x Kg (Si no Spoolman)", value=tool.precioFilamento, validation=tool.validar_numero_opcional_no_negativo)
+                input_filamento = ui.number(label="Precio por kg del filamento predeterminado", value=tool.precioFilamento, validation=tool.validar_numero_opcional_no_negativo)
                 input_filamento.props(f"prefix={tool.símboloMoneda}")
 
                 with ui.stepper_navigation():
                     ui.button("Siguiente", on_click=pasos.next)
                     ui.button("Anterior", on_click=pasos.previous).props("flat")
 
-            with ui.step("Dolibarr-ERP"):
+            with ui.step("Dolibarr"):
                 ui.label(
-                    "Configura la URL de tu servicio de Dolibarr para actualizar el precio del producto y otras información"
+                    "Con la URL y el token de Dolibarr puede traer y enviar el precio de venta de cada modelo."
                 )
 
-                input_dolibarr = ui.input(label="URL del servicio de Dolibarr", value=tool.urlDolibarr)
+                input_dolibarr = ui.input(label="URL de Dolibarr", value=tool.urlDolibarr)
 
                 input_dolibarr_token = ui.input(
-                    label="Token del servicio de Dolibarr",
+                    label="Token de la API de Dolibarr",
                     value=tool.tokenDolibarr,
                     password=True,
                     password_toggle_button=True,
@@ -198,16 +198,15 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
                     ui.button("Siguiente", on_click=pasos.next)
                     ui.button("Anterior", on_click=pasos.previous).props("flat")
 
-            with ui.step("Ganancia"):
-                input_ganancia = ui.number(label="Ganancia Impresión", value=tool.porcentajeGananciaBase, validation=lambda v: _validar_margen(tool, v))
-                input_ganancia.props("prefix=%")
-                input_ganancia_extras = ui.number(label="Ganancia Extras", value=tool.porcentajeGananciaExtras, validation=lambda v: _validar_margen(tool, v))
-                input_ganancia_extras.props("prefix=%")
-                input_ganancia_ensamblado = ui.number(label="Ganancia Ensamblado", value=tool.porcentajeGananciaEnsamblado, validation=lambda v: _validar_margen(tool, v))
-                input_ganancia_ensamblado.props("prefix=%")
+            with ui.step("Márgenes"):
+                input_ganancia = ui.number(label="Margen sobre impresión", value=tool.porcentajeGananciaBase, validation=lambda v: _validar_margen(tool, v))
+                input_ganancia.props('suffix=% hint="Porcentaje del precio sin IVA. Debe ser menor que 100."')
+                input_ganancia_extras = ui.number(label="Margen sobre extras", value=tool.porcentajeGananciaExtras, validation=lambda v: _validar_margen(tool, v))
+                input_ganancia_extras.props("suffix=%")
+                input_ganancia_ensamblado = ui.number(label="Margen sobre ensamblaje", value=tool.porcentajeGananciaEnsamblado, validation=lambda v: _validar_margen(tool, v))
+                input_ganancia_ensamblado.props("suffix=%")
 
                 with ui.stepper_navigation():
-                    ui.button("Salvar", on_click=salvar_configuration)
                     ui.button("Anterior", on_click=pasos.previous).props("flat")
 
             input_impresora = {
@@ -233,9 +232,20 @@ def registraPaginaConfig(tool: "printtool", add_interface: Callable[[bool, str],
             }
 
             entradas_numericas = [entrada for entrada in input_impresora if isinstance(entrada, ui.number)]
+            entradas_moneda = [
+                input_costo_impresora,
+                input_envio_impresora,
+                input_mantenimiento,
+                input_trabajo,
+                input_kwh,
+                input_filamento,
+            ]
 
-            ancho_input: str = "w-60"
+            ancho_input: str = "w-80"
             for entrada in input_impresora:
                 entrada.classes(ancho_input)
+
+        with ui.row().classes("w-full justify-center q-mt-md"):
+            ui.button("Guardar configuración", icon="save", on_click=salvar_configuration)
 
         add_interface(interface, current_page="/config")

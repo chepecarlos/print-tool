@@ -18,6 +18,17 @@ install:
 		&& echo "✓ printtool instalado y disponible en el PATH" \
 		|| (echo "✗ printtool no quedó funcional en el PATH" >&2; exit 1)
 
+# entorno de desarrollo: venv local con el paquete editable y las dependencias de test
+VENV = venv
+
+installdev:
+	@echo "Preparando entorno de desarrollo en $(VENV)/ ..."
+	git submodule update --init
+	test -d $(VENV) || python3 -m venv $(VENV)
+	$(VENV)/bin/pip install --upgrade pip
+	$(VENV)/bin/pip install -e ".[dev]"
+	@echo "✓ Listo. Activa con: source $(VENV)/bin/activate"
+
 # preparar el entorno de sistema (paquetes apt necesarios)
 dependencias:
 	@echo "Instalando dependencias de sistema..."

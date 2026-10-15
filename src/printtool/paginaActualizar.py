@@ -19,7 +19,7 @@ def _validar_link(value):
         return None
     parsed = urlparse(str(value).strip())
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return "URL invalida. Use http:// o https://"
+        return "Enlace no válido: debe empezar por http:// o https://"
     return None
 
 
@@ -27,7 +27,7 @@ def _validar_sku(value):
     if value is None or str(value).strip() == "":
         return None
     if not re.fullmatch(r"[A-Za-z0-9._-]{3,40}", str(value).strip()):
-        return "SKU invalido (3-40, letras, numeros, . _ -)"
+        return "SKU no válido: de 3 a 40 caracteres; letras, números, punto, guion o guion bajo"
     return None
 
 
@@ -35,7 +35,7 @@ def _validar_descripcion(value):
     if value is None:
         return None
     if len(str(value)) > 500:
-        return "Maximo 500 caracteres"
+        return "Máximo 500 caracteres"
     return None
 
 
@@ -57,11 +57,11 @@ def cargarPaginaActualizar(tool: "printtool") -> None:
             return
 
         if inventario is None or inventario < 0:
-            ui.notify("El inventario debe ser un entero >= 0", type="negative")
+            ui.notify("El inventario debe ser un número entero mayor o igual a 0.", type="negative")
             return
 
         if idProducto is None or idProducto < 0:
-            ui.notify("El ID del producto debe ser un entero >= 0", type="negative")
+            ui.notify("El ID de producto en Dolibarr debe ser un número entero mayor o igual a 0.", type="negative")
             return
 
         valid_link = _validar_link(link)
@@ -108,12 +108,12 @@ def cargarPaginaActualizar(tool: "printtool") -> None:
             _salvar(campo, valor)
 
         logger.info("Guardando información del modelo")
-        ui.notify("Salvando información")
+        ui.notify("Información del modelo guardada", type="positive")
 
     with ui.column().classes("w-full items-center"):
-        ui.label("Editar información").classes("text-h5 font-bold text-center w-full q-mb-sm")
+        ui.label("Información del modelo").props('role=heading aria-level=1').classes("text-h5 font-bold text-center w-full q-mb-sm")
         ui.separator().classes("w-64 q-mb-md")
-        ui.label(f"Ruta proyecto: {tool.folderProyecto}").classes("text-white w-64 text-center break-words")
+        ui.label(f"Carpeta: {tool.folderProyecto}").classes("text-white max-w-xl text-center break-all")
 
     with ui.grid(columns=2).classes("gap-3 max-w-3xl mx-auto justify-items-center"):
 
@@ -123,7 +123,7 @@ def cargarPaginaActualizar(tool: "printtool") -> None:
             validation=tool.validar_texto_requerido,
         )
         tool.textoPropiedad = ui.input(label="Propiedad", value=tool.propiedadModelo)
-        tool.tipoImpresion = ui.select(tool.tipoProductos, label="tipo", value=tool.tipoModelo)
+        tool.tipoImpresion = ui.select(tool.tipoProductos, label="Tipo", value=tool.tipoModelo)
         tool.textoInventario = ui.number(
             label="Inventario",
             value=tool.inventario,
@@ -131,7 +131,7 @@ def cargarPaginaActualizar(tool: "printtool") -> None:
             step=1,
         )
         tool.textoSKU = ui.input(label="SKU", value=tool.skuModelo, validation=_validar_sku)
-        tool.textoLink = ui.input(label="Link", value=tool.linkModelo, validation=_validar_link)
+        tool.textoLink = ui.input(label="Enlace", value=tool.linkModelo, validation=_validar_link)
 
         anchoSimilar = {
             tool.textoNombre,
@@ -144,7 +144,7 @@ def cargarPaginaActualizar(tool: "printtool") -> None:
 
         if tool.urlDolibarr != "" and tool.tokenDolibarr != "":
             tool.textoIdProducto = ui.number(
-                label="ID Producto Dolibarr",
+                label="ID de producto en Dolibarr",
                 value=tool.idProductoDolibarr,
                 validation=tool.validar_entero_no_negativo,
                 step=1,
@@ -156,7 +156,7 @@ def cargarPaginaActualizar(tool: "printtool") -> None:
 
         tool.textoDescripcion = (
             ui.textarea(
-                label="Descripcion",
+                label="Descripción",
                 value=tool.descripciónModelo,
                 validation=_validar_descripcion,
             )

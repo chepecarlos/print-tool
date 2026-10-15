@@ -5,6 +5,7 @@ from nicegui import ui
 # multiprocessing.set_start_method("spawn", force=True)
 
 from printtool.printtool import printtool
+from printtool.tema import aplicarTema
 
 
 class inventario:
@@ -39,7 +40,7 @@ class inventario:
             with ui.element("q-toolbar"):
                 with ui.element("q-toolbar-title"):
                     ui.label(objetoPrintTool.nombreModelo)
-                ui.button(icon="close", on_click=dialog.close).props("flat round dense")
+                ui.button(icon="close", on_click=dialog.close).props('flat round dense aria-label="Cerrar"')
             with ui.element("q-card-section"):
                 objetoPrintTool.cargarGui(True)
 
@@ -48,34 +49,35 @@ class inventario:
     def cargarGUI(self):
         "Cargar la interfaz gráfica de usuario (GUI) del sistema de inventario."
 
-        with ui.header(elevated=True) as cabecera:
-            cabecera.classes("bg-teal-700 items-center justify-between")
-            cabecera.style("height: 5vh; padding: 1px")
-            with ui.row().classes("w-full justify-center items-center"):
-                ui.label("Inventario de PrintTool").classes("text-h5 px-8")
+        aplicarTema()
+
+        with ui.header() as cabecera:
+            cabecera.classes("bg-primary items-center justify-between")
+            cabecera.style("min-height: 48px; padding: 0 16px")
+            with ui.row().classes("w-full items-center no-wrap"):
+                ui.label("Inventario de PrintTool").classes("text-h5 truncate min-w-0").props('role=heading aria-level=1')
 
         columnaInfo = [
-            {"name": "nombre", "label": "Nombre", "field": "nombre", "align": "center"},
+            {"name": "nombre", "label": "Nombre", "field": "nombre", "align": "left", "sortable": True},
             {
                 "name": "propiedad",
                 "label": "Propiedad",
                 "field": "propiedad",
-                "align": "center",
+                "align": "left",
             },
-            {"name": "tipo", "label": "Tipo", "field": "tipo", "align": "center"},
+            {"name": "tipo", "label": "Tipo", "field": "tipo", "align": "left"},
             {
                 "name": "precio",
                 "label": "Precio",
                 "field": "precio",
-                "align": "center",
+                "align": "right",
                 "sortable": True,
-                ":format": 'value => "{self.símboloMoneda}" + value',
             },
             {
                 "name": "inventario",
                 "label": "Inventario",
                 "field": "inventario",
-                "align": "center",
+                "align": "right",
                 "sortable": True,
             },
         ]
@@ -101,6 +103,10 @@ class inventario:
                 }
             )
 
+        # el símbolo viene de la configuración global, igual para todos los proyectos
+        simbolo = dataInfo and proyectoPrint.símboloMoneda or "$"
+        columnaInfo[3][":format"] = f'value => "{simbolo} " + Number(value).toFixed(2)'
+
         self.tablaInfo = ui.table(
             columns=columnaInfo,
             rows=dataInfo,
@@ -115,18 +121,18 @@ class inventario:
 
             with tabla.add_slot("top-right"):
                 with (
-                    ui.input(placeholder="Search").props("type=search").bind_value(tabla, "filter").add_slot("append")
+                    ui.input(placeholder="Buscar").props("type=search").bind_value(tabla, "filter").add_slot("append")
                 ):
                     ui.icon("search")
             with tabla.add_slot("top-left"):
-                ui.button("Editar", on_click=lambda: self.abrirProyecto(tabla.selected)).bind_visibility_from(
+                ui.button("Abrir proyecto", on_click=lambda: self.abrirProyecto(tabla.selected)).bind_visibility_from(
                     tabla, "selected", backward=lambda val: bool(val)
                 )
         self.tablaInfo.update()
 
         with ui.footer() as pie:
-            pie.classes("bg-teal-700")
-            pie.style("height: 5vh; padding: 1px")
+            pie.classes("bg-primary")
+            pie.style("min-height: 32px; padding: 4px 16px")
             with ui.row().classes("w-full justify-center items-center"):
                 ui.label("Creado por ChepeCarlos").classes("text-white")
 

@@ -19,13 +19,13 @@ def cargarPaginaPrecio(tool: "printtool") -> None:
         {
             "referencia": "costoUnidad",
             "final": "costoUnidad",
-            "humano": "Costo Fabricación",
+            "humano": "Costo de fabricación",
             "formato": lambda x: f"{tool.símboloMoneda} {x:.2f}",
         },
         {
             "referencia": "porcentajeGananciaReferencia",
             "final": "porcentajeGananciaFinal",
-            "humano": "Margen Ganancia",
+            "humano": "Margen de ganancia",
             "formato": lambda x: f"{x:.2f} %",
         },
         {
@@ -37,28 +37,28 @@ def cargarPaginaPrecio(tool: "printtool") -> None:
         {
             "referencia": "precioSinIvaReferencia",
             "final": "precioSinIvaFinal",
-            "humano": "Precio antes iva",
+            "humano": "Precio sin IVA",
             "formato": lambda x: f"{tool.símboloMoneda} {x:.2f}",
         },
         {
             "referencia": "ivaReferencia",
             "final": "ivaFinal",
-            "humano": "Iva",
+            "humano": "IVA",
             "formato": lambda x: f"{tool.símboloMoneda} {x:.2f}",
         },
         {
             "referencia": "precioVentaReferencia",
             "final": "precioVentaFinal",
-            "humano": "Precio Venta",
+            "humano": "Precio de venta",
             "formato": lambda x: f"{tool.símboloMoneda} {x:.2f}",
         },
     ]
 
     with ui.column().classes("w-full justify-center items-center"):
         with ui.grid(columns=3).classes("justify-center items-center w-full max-w-2xl gap-4"):
-            ui.label("Calculo").classes("font-bold text-center")
-            ui.label("Referencia").classes("font-bold text-center")
-            ui.label("Final").classes("font-bold text-center")
+            ui.label("Concepto").classes("font-bold")
+            ui.label("Referencia").classes("font-bold text-right")
+            ui.label("Final").classes("font-bold text-right")
 
             for idPrecio, precioActual in enumerate(dataPrecio):
                 esUltimo = idPrecio == len(dataPrecio) - 1
@@ -71,38 +71,38 @@ def cargarPaginaPrecio(tool: "printtool") -> None:
                     tool,
                     precioActual["referencia"],
                     lambda x, transform_func=precioActual["formato"]: transform_func(x),
-                ).classes("text-center" + (" font-bold text-lg" if esUltimo else ""))
+                ).classes("text-right" + (" font-bold text-lg" if esUltimo else ""))
                 ui.label().bind_text_from(
                     tool,
                     precioActual["final"],
                     lambda x, transform_func=precioActual["formato"]: transform_func(x),
-                ).classes("text-center" + (" font-bold text-lg text-green-400" if esUltimo else ""))
+                ).classes("text-right" + (" font-bold text-lg text-verde-precio" if esUltimo else ""))
 
         ui.separator().classes("my-4 w-full")
         with ui.row().classes("w-full justify-center"):
             with ui.column().classes("justify-center items-center gap-2"):
-                ui.label("Actualizar Precio de Venta").classes("font-bold")
+                ui.label("Fijar precio de venta").classes("text-subtitle1").props('role=heading aria-level=2')
                 with ui.row().props("rounded outlined").classes("items-center gap-2"):
                     tool.textoVenta = ui.number(
-                        label="Nuevo Precio",
+                        label="Precio de venta final",
                         value=tool.precioVentaFinal,
                         validation=tool.validar_numero_no_negativo,
                         step=0.01,
                     ).classes("min-w-48")
                     ui.button(on_click=tool.actualizarPrecios, icon="check").props(
-                        'color=positive aria-label="Aplicar nuevo precio"'
+                        'color=positive aria-label="Guardar precio de venta"'
                     ).classes("h-full")
                     tool.textoVenta.on("keydown.enter", tool.actualizarPrecios)
 
         ui.separator().classes("my-4 w-full")
         with ui.row().classes("w-full justify-center"):
             with ui.column().classes("justify-center items-center gap-2"):
-                ui.label("Dolibarr ERP").classes("font-bold")
+                ui.label("Dolibarr").classes("text-subtitle1").props('role=heading aria-level=2')
 
                 def _id_producto_valido() -> bool:
                     if not tool.idProductoDolibarr:
                         ui.notify(
-                            "Este modelo no tiene ID de producto de Dolibarr. Asígnelo en la pestaña Modelo.",
+                            "Este modelo no tiene ID de producto en Dolibarr. Asígnelo en la pestaña Modelo.",
                             type="warning",
                         )
                         return False
@@ -128,7 +128,7 @@ def cargarPaginaPrecio(tool: "printtool") -> None:
                         return
                     tool.textoVenta.set_value(precio)
                     tool.actualizarPrecios()
-                    ui.notify(f"Precio consultado desde Dolibarr: {tool.símboloMoneda}{precio:.2f}", type="positive")
+                    ui.notify(f"Precio traído de Dolibarr: {tool.símboloMoneda} {precio:.2f}", type="positive")
 
                 async def _actualizar():
                     if not _id_producto_valido():
@@ -150,29 +150,29 @@ def cargarPaginaPrecio(tool: "printtool") -> None:
                         ui.notify(error, type="negative")
                         return
                     ui.notify(
-                        f"Precio actualizado en Dolibarr: {tool.símboloMoneda}{tool.precioVentaFinal:.2f}",
+                        f"Precio enviado a Dolibarr: {tool.símboloMoneda} {tool.precioVentaFinal:.2f}",
                         type="positive",
                     )
 
                 with ui.row().classes("items-center gap-2"):
                     boton_consultar = ui.button(
-                        "Consultar precio en Dolibarr",
+                        "Traer precio de Dolibarr",
                         on_click=_consultar,
                         icon="search",
                     ).props("outline")
                     with boton_consultar:
-                        ui.tooltip("Consultar el precio actual registrado en Dolibarr.")
+                        ui.tooltip("Reemplaza el precio final por el que tiene el producto en Dolibarr.")
                     boton_actualizar = ui.button(
-                        "Actualizar precio en Dolibarr",
+                        "Enviar precio a Dolibarr",
                         on_click=_actualizar,
                         icon="publish",
                     ).props("outline")
                     with boton_actualizar:
-                        ui.tooltip("Enviar el precio final del modelo a Dolibarr.")
+                        ui.tooltip("Publica el precio de venta final en el producto de Dolibarr.")
 
                 if not dolibarr_configurado:
                     boton_actualizar.disable()
                     boton_consultar.disable()
-                    ui.label("Configure URL y token de Dolibarr para habilitar estas acciones.").classes(
-                        "text-orange-300 text-sm"
+                    ui.label("Para usar Dolibarr, agregue su URL y token en Menú › Configurar.").classes(
+                        "text-ambar-costo text-sm"
                     )

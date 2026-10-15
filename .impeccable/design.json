@@ -1,0 +1,383 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-15T20:19:24+00:00",
+  "title": "Design System: PrintTool",
+  "extensions": {
+    "colorMeta": {
+      "teal-taller": {
+        "role": "primary",
+        "displayName": "Teal del taller",
+        "canonical": "oklch(51.1% 0.086 186.4)",
+        "tonalRamp": [
+          "#001310",
+          "#002F2A",
+          "#004E47",
+          "#006D65",
+          "#338E85",
+          "#58B0A7",
+          "#7FD7CD",
+          "#B3FFF6"
+        ]
+      },
+      "teal-claro": {
+        "role": "primary",
+        "displayName": "Teal claro",
+        "canonical": "oklch(71.2% 0.098 186.7)",
+        "tonalRamp": [
+          "#001310",
+          "#00302B",
+          "#004F48",
+          "#006F66",
+          "#1A9087",
+          "#49B2A8",
+          "#74D9CE",
+          "#ACFFF7"
+        ]
+      },
+      "grafito-pagina": {
+        "role": "neutral",
+        "displayName": "Grafito de página",
+        "canonical": "oklch(18.2% 0.000 89.9)",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#242424",
+          "#404040",
+          "#5D5D5D",
+          "#7D7D7D",
+          "#9E9E9E",
+          "#C4C4C4",
+          "#EEEEEE"
+        ]
+      },
+      "grafito-panel": {
+        "role": "neutral",
+        "displayName": "Grafito de panel",
+        "canonical": "oklch(23.1% 0.000 89.9)",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#242424",
+          "#404040",
+          "#5D5D5D",
+          "#7D7D7D",
+          "#9E9E9E",
+          "#C4C4C4",
+          "#EEEEEE"
+        ]
+      },
+      "tinta": {
+        "role": "neutral",
+        "displayName": "Tinta",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#242424",
+          "#404040",
+          "#5D5D5D",
+          "#7D7D7D",
+          "#9E9E9E",
+          "#C4C4C4",
+          "#EEEEEE"
+        ]
+      },
+      "tinta-secundaria": {
+        "role": "neutral",
+        "displayName": "Tinta secundaria",
+        "canonical": "oklch(69.9% 0.000 89.9)",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#242424",
+          "#404040",
+          "#5D5D5D",
+          "#7D7D7D",
+          "#9E9E9E",
+          "#C4C4C4",
+          "#EEEEEE"
+        ]
+      },
+      "linea": {
+        "role": "neutral",
+        "displayName": "Línea",
+        "canonical": "rgba(255, 255, 255, 0.28)"
+      },
+      "verde-precio": {
+        "role": "semantic",
+        "displayName": "Verde precio",
+        "canonical": "oklch(80.0% 0.182 151.7)",
+        "tonalRamp": [
+          "#001600",
+          "#003400",
+          "#005402",
+          "#00771E",
+          "#009A40",
+          "#11BD61",
+          "#66E18E",
+          "#A4FFC0"
+        ]
+      },
+      "verde-confirmacion": {
+        "role": "semantic",
+        "displayName": "Verde confirmación",
+        "canonical": "oklch(52.7% 0.137 150.1)",
+        "tonalRamp": [
+          "#001400",
+          "#003100",
+          "#005015",
+          "#00722F",
+          "#31934F",
+          "#57B66F",
+          "#84DB98",
+          "#B9FFC8"
+        ]
+      },
+      "ambar-costo": {
+        "role": "semantic",
+        "displayName": "Ámbar costo",
+        "canonical": "oklch(86.1% 0.173 91.9)",
+        "tonalRamp": [
+          "#1C0300",
+          "#3B1C00",
+          "#5D3800",
+          "#815500",
+          "#A27600",
+          "#C59800",
+          "#E8C031",
+          "#FFEC80"
+        ]
+      },
+      "rojo-error": {
+        "role": "semantic",
+        "displayName": "Rojo error",
+        "canonical": "oklch(51.0% 0.208 26.7)",
+        "tonalRamp": [
+          "#310000",
+          "#5A0000",
+          "#860000",
+          "#B4000C",
+          "#DE3231",
+          "#FF5C53",
+          "#FF8F82",
+          "#FFC4B6"
+        ]
+      },
+      "rojo-texto": {
+        "role": "semantic",
+        "displayName": "Rojo texto",
+        "canonical": "oklch(71.1% 0.166 22.2)",
+        "tonalRamp": [
+          "#3D0004",
+          "#640711",
+          "#8C1B23",
+          "#B53137",
+          "#DF474C",
+          "#FF6E6C",
+          "#FF9D99",
+          "#FFD9D6"
+        ]
+      },
+      "muestra-vacia": {
+        "role": "neutral",
+        "displayName": "Muestra vacía",
+        "canonical": "oklch(25.2% 0.000 89.9)",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#242424",
+          "#404040",
+          "#5D5D5D",
+          "#7D7D7D",
+          "#9E9E9E",
+          "#C4C4C4",
+          "#EEEEEE"
+        ]
+      },
+      "borde-muestra": {
+        "role": "neutral",
+        "displayName": "Borde de muestra",
+        "canonical": "oklch(55.1% 0.023 264.4)",
+        "tonalRamp": [
+          "#070B15",
+          "#1E2430",
+          "#3A404C",
+          "#575E6B",
+          "#767D8C",
+          "#979FAD",
+          "#BDC4D4",
+          "#E7EFFF"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Nombre de la app en la barra superior."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Nombre del modelo activo y títulos de página."
+      },
+      "subtitle": {
+        "displayName": "Subtitle",
+        "purpose": "Título de cada panel."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Etiquetas de fila, botones y celdas."
+      },
+      "number": {
+        "displayName": "Number",
+        "purpose": "Toda cifra con unidad; tabular, alineada a la derecha."
+      },
+      "total": {
+        "displayName": "Total",
+        "purpose": "Fila final de una ficha de cálculo."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Etiquetas flotantes y ayudas bajo un campo."
+      }
+    },
+    "shadows": [
+      {
+        "name": "flotante",
+        "value": "0 1px 5px rgba(0,0,0,0.2), 0 2px 2px rgba(0,0,0,0.14), 0 3px 1px -2px rgba(0,0,0,0.12)",
+        "purpose": "Sombra por defecto de Quasar; solo menús, diálogos, notificaciones y desplegables."
+      }
+    ],
+    "motion": [
+      {
+        "name": "quasar-estandar",
+        "value": "0.3s cubic-bezier(0.215, 0.61, 0.355, 1)",
+        "purpose": "Transición por defecto de Quasar para pestañas, pasos y expansiones."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "ventana-nativa",
+        "value": "1024px"
+      },
+      {
+        "name": "matriz-scroll",
+        "value": "760px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botón principal",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Única acción sólida de cada sección: Guardar, Aplicar, Salvar.",
+      "html": "<button class=\"ds-btn-primary\">Guardar</button>",
+      "css": ".ds-btn-primary { font-family: Roboto, -apple-system, \"Helvetica Neue\", Arial, sans-serif; background: #0F766E; color: #FFFFFF; border: none; border-radius: 4px; height: 36px; padding: 4px 16px; font-size: 14px; font-weight: 500; letter-spacing: 0.0892857143em; text-transform: uppercase; cursor: pointer; transition: background 0.2s ease-out; } .ds-btn-primary:hover { background: #0D6961; } .ds-btn-primary:focus-visible { outline: 2px solid #4DB6AC; outline-offset: 2px; } .ds-btn-primary:active { background: #0B5A53; }"
+    },
+    {
+      "name": "Botón outline",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Acciones secundarias sobre grafito: consultar, anterior, cargar.",
+      "html": "<button class=\"ds-btn-outline\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14\"/></svg>Consultar precio en Dolibarr</button>",
+      "css": ".ds-btn-outline { font-family: Roboto, -apple-system, \"Helvetica Neue\", Arial, sans-serif; display: inline-flex; align-items: center; gap: 8px; background: transparent; color: #4DB6AC; border: 1px solid currentColor; border-radius: 4px; height: 36px; padding: 4px 16px; font-size: 14px; font-weight: 500; letter-spacing: 0.0892857143em; text-transform: uppercase; cursor: pointer; transition: background 0.2s ease-out; } .ds-btn-outline:hover { background: rgba(77, 182, 172, 0.12); } .ds-btn-outline:focus-visible { outline: 2px solid #4DB6AC; outline-offset: 2px; }"
+    },
+    {
+      "name": "Botón destructivo",
+      "kind": "button",
+      "refersTo": "button-destructivo",
+      "description": "Borrar, limpiar o salir: texto/icono rojo, nunca sólido fuera de un diálogo.",
+      "html": "<button class=\"ds-btn-danger\" aria-label=\"Limpiar slots del proyecto\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z\"/></svg></button>",
+      "css": ".ds-btn-danger { display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #F87171; border: 1px solid currentColor; border-radius: 4px; height: 36px; min-width: 44px; padding: 4px 12px; cursor: pointer; transition: background 0.2s ease-out; } .ds-btn-danger:hover { background: rgba(248, 113, 113, 0.12); } .ds-btn-danger:focus-visible { outline: 2px solid #4DB6AC; outline-offset: 2px; }"
+    },
+    {
+      "name": "Campo numérico",
+      "kind": "input",
+      "refersTo": "input-campo",
+      "description": "Input outlined dense con etiqueta flotante y unidad como prefijo.",
+      "html": "<label class=\"ds-input\"><span class=\"ds-input-label\">Costo kWh</span><span class=\"ds-input-box\"><span class=\"ds-input-prefix\">$</span><input type=\"number\" value=\"0.18\" step=\"0.01\"></span></label>",
+      "css": ".ds-input { font-family: Roboto, -apple-system, \"Helvetica Neue\", Arial, sans-serif; display: inline-flex; flex-direction: column; gap: 4px; width: 240px; color: #FFFFFF; } .ds-input-label { font-size: 0.75rem; line-height: 1.25rem; color: #9E9E9E; } .ds-input-box { display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 4px; background: transparent; transition: border-color 0.2s ease-out; } .ds-input-box:hover { border-color: #FFFFFF; } .ds-input-box:focus-within { border: 2px solid #4DB6AC; padding: 0 11px; } .ds-input-prefix { color: #9E9E9E; } .ds-input input { all: unset; flex: 1; font-size: 14px; font-variant-numeric: tabular-nums; text-align: right; color: #FFFFFF; caret-color: #4DB6AC; }"
+    },
+    {
+      "name": "Barra superior",
+      "kind": "nav",
+      "refersTo": "barra-superior",
+      "description": "Nombre de la app, modelo activo centrado y menú.",
+      "html": "<header class=\"ds-bar\"><span class=\"ds-bar-app\">PrintTool</span><span class=\"ds-bar-model\">Muñeco Nieve</span><button class=\"ds-bar-menu\" aria-label=\"Menú\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M3 18h18v-2H3zm0-5h18v-2H3zm0-7v2h18V6z\"/></svg></button></header>",
+      "css": ".ds-bar { font-family: Roboto, -apple-system, \"Helvetica Neue\", Arial, sans-serif; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 48px; padding: 0 8px 0 16px; background: #0F766E; color: #FFFFFF; } .ds-bar-app { font-size: 1.5rem; line-height: 2rem; } .ds-bar-model { font-size: 1.25rem; font-weight: 500; letter-spacing: 0.0125em; } .ds-bar-menu { justify-self: end; display: inline-flex; background: transparent; color: #FFFFFF; border: none; border-radius: 4px; padding: 6px; cursor: pointer; } .ds-bar-menu:hover { background: rgba(255, 255, 255, 0.12); } .ds-bar-menu:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }"
+    },
+    {
+      "name": "Pestañas",
+      "kind": "nav",
+      "refersTo": "barra-superior",
+      "description": "Info, Costos, Precio, Modelo: icono sobre etiqueta, subrayado en la activa.",
+      "html": "<nav class=\"ds-tabs\"><button class=\"ds-tab is-active\" aria-current=\"page\">Info</button><button class=\"ds-tab\">Costos</button><button class=\"ds-tab\">Precio</button><button class=\"ds-tab\">Modelo</button></nav>",
+      "css": ".ds-tabs { font-family: Roboto, -apple-system, \"Helvetica Neue\", Arial, sans-serif; display: flex; justify-content: center; background: #121212; } .ds-tab { background: transparent; color: rgba(255, 255, 255, 0.7); border: none; border-bottom: 2px solid transparent; padding: 12px 16px; font-size: 14px; font-weight: 500; letter-spacing: 0.0892857143em; text-transform: uppercase; cursor: pointer; transition: color 0.2s ease-out, border-color 0.2s ease-out; } .ds-tab:hover { color: #FFFFFF; } .ds-tab.is-active { color: #FFFFFF; border-bottom-color: #FFFFFF; } .ds-tab:focus-visible { outline: 2px solid #4DB6AC; outline-offset: -2px; }"
+    },
+    {
+      "name": "Ficha de cálculo",
+      "kind": "custom",
+      "refersTo": "fila-total",
+      "description": "Signature: filas etiqueta → cifra tabular, línea y total semántico.",
+      "html": "<div class=\"ds-ficha\"><span>Costo de Filamento</span><span class=\"ds-num\">$ 1.38</span><span>Costo uso máquina</span><span class=\"ds-num\">$ 0.92</span><span>Costo Extras</span><span class=\"ds-num\">$ 0.50</span><hr><span class=\"ds-total\">Costo Total</span><span class=\"ds-num ds-total ds-costo\">$ 2.80</span><span class=\"ds-total\">Precio Venta</span><span class=\"ds-num ds-total ds-precio\">$ 10.00</span></div>",
+      "css": ".ds-ficha { font-family: Roboto, -apple-system, \"Helvetica Neue\", Arial, sans-serif; display: grid; grid-template-columns: auto auto; column-gap: 32px; row-gap: 8px; padding: 16px; width: max-content; background: #1D1D1D; border-radius: 4px; color: #FFFFFF; font-size: 14px; line-height: 1.5; } .ds-ficha hr { grid-column: 1 / -1; border: none; height: 1px; margin: 4px 0; background: rgba(255, 255, 255, 0.28); } .ds-num { text-align: right; font-variant-numeric: tabular-nums; } .ds-total { font-size: 1.125rem; font-weight: 700; line-height: 1.75rem; } .ds-costo { color: #FACC15; } .ds-precio { color: #4ADE80; }"
+    },
+    {
+      "name": "Muestra de color",
+      "kind": "custom",
+      "refersTo": "muestra-color",
+      "description": "Signature: cuadro de color de filamento, siempre junto a su nombre.",
+      "html": "<div class=\"ds-slots\"><span class=\"ds-slot\"><span class=\"ds-swatch\" style=\"background:#E8E8E8\"></span>Color 1 · PLA Blanco</span><span class=\"ds-slot\"><span class=\"ds-swatch\" style=\"background:#C62828\"></span>Color 2 · PETG Rojo</span><span class=\"ds-slot\"><span class=\"ds-swatch\"></span>Color 3 · Sin asignar</span></div>",
+      "css": ".ds-slots { font-family: Roboto, -apple-system, \"Helvetica Neue\", Arial, sans-serif; display: flex; flex-direction: column; gap: 8px; color: #FFFFFF; font-size: 14px; } .ds-slot { display: inline-flex; align-items: center; gap: 8px; } .ds-swatch { width: 32px; height: 32px; flex-shrink: 0; border-radius: 4px; border: 1px solid #6B7280; background: #222222; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "La hoja de cálculo del taller",
+    "overview": "PrintTool es la planilla donde el taller cuadra cada modelo antes de venderlo: filas de conceptos, columnas de valores y un total al pie que se puede rastrear hasta su origen (G-code, configuración, extras). La interfaz se comporta como esa hoja: etiqueta a la izquierda, cifra alineada a la derecha, una línea antes del total. El valor visual está en que los números se lean y se comparen, no en la decoración.\n\nEl mundo es oscuro y plano: una página grafito, paneles un tono más claros y una sola voz de color, el teal del taller, en la barra superior, en la acción principal y en el foco. El resto del color tiene significado: verde para el precio y lo confirmado, ámbar para el costo y lo que pide atención, rojo para el error y lo que borra. Densidad media-alta, pensada para una PC de escritorio justo después de laminar, con la ventana nativa de 1024×786 como lienzo de referencia.\n\nSe apoya en Quasar/NiceGUI (Roboto, iconos Material) y no lo pelea: el sistema define tokens y las reglas para usarlos, no un framework visual propio.",
+    "keyCharacteristics": [
+      "Filas etiqueta → valor, cifras tabulares alineadas a la derecha, totales separados por una línea.",
+      "Un solo color de marca (teal) para la estructura y la acción principal.",
+      "Color de acento solo con significado (precio, costo, error); nunca decorativo.",
+      "Profundidad por capas tonales, sin sombras en reposo.",
+      "Controles compactos: inputs con borde, botones sólidos solo para la acción principal."
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "El teal es el único color de marca. Ningún botón, pestaña o paso usa el azul por defecto de Quasar: `ui.colors(primary=\"#0F766E\", positive=\"#15803D\", negative=\"#C10015\")` se fija una vez al iniciar.",
+        "section": "colors"
+      },
+      {
+        "name": "The Meaning-Only Rule",
+        "body": "Un acento de color siempre significa algo: verde = precio u ok, ámbar = costo o atención, rojo = error o borrar. Si un color no responde a \"¿qué significa?\", se quita (el cian decorativo del estado de fuente pasa a tinta secundaria).",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Toda cifra se escribe con números tabulares, alineada a la derecha y con su unidad en el mismo formato en todas las pantallas (`55.15 g`, `2 h 53 m`, `$ 10.00`). Un número que no se alinea con su columna no se puede comparar.",
+        "section": "typography"
+      },
+      {
+        "name": "The Fixed Chrome Rule",
+        "body": "La barra superior y el pie usan altura en píxeles (48px y 32px), no `vh`. Con `5vh` el título se desborda en ventanas bajas. Es el comportamiento actual y está pendiente de corregir.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat-At-Rest Rule",
+        "body": "Paneles y tarjetas usan `flat` (sin sombra) y se distinguen por tono. Una sombra significa \"esto flota y se va a cerrar\".",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** fijar `ui.colors(primary=\"#0F766E\", positive=\"#15803D\", negative=\"#C10015\")` al iniciar, para que botones, foco, pasos y notificaciones hablen teal.",
+      "**Do** usar teal claro (`#4DB6AC`, `color=teal-4` en Quasar) para texto o icono teal sobre grafito.",
+      "**Do** alinear las cifras a la derecha con `tabular-nums` y la unidad en el formato común (`g`, `h m`, `%`, símbolo de moneda configurable).",
+      "**Do** separar el total con una línea y darle peso 700 a 1.125rem.",
+      "**Do** acompañar cada muestra de color con su nombre de filamento.",
+      "**Do** usar `outlined dense` en todos los campos de entrada."
+    ],
+    "donts": [
+      "**Don't** dejar el azul por defecto de Quasar (`#1976D2`) en ningún control.",
+      "**Don't** usar color sin significado: nada de cian decorativo ni de colores distintos para el mismo estado (ámbar y naranja para un mismo aviso).",
+      "**Don't** poner sombras a paneles en reposo; la separación es tonal.",
+      "**Don't** usar esquinas de píldora (`rounded` en inputs) ni radios distintos de 4px.",
+      "**Don't** fijar alturas de barra o paneles en `vh`.",
+      "**Don't** escribir clases de color inexistentes (`bg-teal-00`, `border-teal-600h`, `color=bg-teal-700`): fallan en silencio."
+    ]
+  }
+}

@@ -45,3 +45,21 @@ def test_dolibarr_errores_legibles(monkeypatch):
 
     monkeypatch.setattr(miDolibarr.requests, "get", lambda *a, **k: _Respuesta(200, {"price_ttc": "12.5"}))
     assert miDolibarr.consultarPrecioDolibarr("http://x", "t", 7) == (12.5, None)
+
+
+def test_abrir_proyecto_reinicia_estado(tmp_path, monkeypatch):
+    from printtool import printtool as modulo
+
+    monkeypatch.setattr(modulo.ui.navigate, "reload", lambda: None)
+    a, b = tmp_path / "a", tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    pt = printtool()
+    pt.folderProyecto = str(a)
+    pt.iniciarSistema()
+    pt.costoUnidad = 99.0
+
+    pt.abrirProyecto(str(b))
+
+    assert pt.archivoInfo == str(b / ".printtool" / "info.md")
+    assert pt.costoUnidad == 0
