@@ -1,75 +1,80 @@
 import requests
-import json
-from nicegui import ui
 
 from printtool.MiLibrerias.FuncionesLogging import ConfigurarLogging
 
 logger = ConfigurarLogging(__name__)
 
+TIMEOUT_DOLIBARR = 15
 
-def consultarPrecioDolibarr(urlServidor: str, token: str, idProducto: str) -> float | None:
+
+def _error_http(response: requests.Response, idProducto) -> str:
+    """Traducir un código HTTP de Dolibarr a un mensaje que diga qué revisar."""
+    if response.status_code in (401, 403):
+        return "Dolibarr rechazó el token. Revise el token en Configurar."
+    if response.status_code == 404:
+        return f"El producto {idProducto} no existe en Dolibarr. Revise el ID en la pestaña Modelo."
+    return f"Dolibarr respondió {response.status_code}. Intente de nuevo o revise el servidor."
+
+
+def consultarPrecioDolibarr(urlServidor: str, token: str, idProducto) -> tuple[float | None, str | None]:
     """Consultar el precio actual desde Dolibarr.
 
-    Args:
-        urlServidor(str): URL base del servidor Dolibarr (ej. http://localhost/dolibarr)
-        token(str): Clave API de Dolibarr
-        idProducto(str): ID del producto a consultar en Dolibarr
+    No toca la interfaz: se puede ejecutar fuera del event loop (run.io_bound).
+
     Returns:
-        float | None: Precio del producto consultado, o None si hubo un error.
+        tuple: (precio, None) si salió bien, o (None, mensaje de error) si falló.
     """
 
     endpoint = f"{urlServidor.rstrip('/')}/api/index.php/products/{idProducto}"
     headers = {"DOLAPIKEY": token}
 
     try:
-        response = requests.get(endpoint, headers=headers, timeout=15)
+        response = requests.get(endpoint, headers=headers, timeout=TIMEOUT_DOLIBARR)
+    except requests.Timeout:
+        return None, f"Dolibarr no respondió en {TIMEOUT_DOLIBARR} s."
     except requests.RequestException as exc:
         logger.warning(f"Error de conexión con Dolibarr {endpoint}: {exc}")
-        return None
+        return None, "No se pudo conectar con Dolibarr. Revise la URL en Configurar."
 
-    if response.status_code == 200:
-        producto = response.json()
-        tipo = str(producto.get("type", ""))
-        precio = float(producto.get("price_ttc", 0) or 0)
-        logger.info("Producto encontrado:")
-        logger.info(f"ID: {producto.get('id')}")
-        logger.info(f"Referencia: {producto.get('ref', '')}")
-        logger.info(f"Nombre: {producto.get('label', '')}")
-        logger.info(f"Tipo: {'Producto' if tipo == '0' else 'Servicio'}")
-        logger.info(f"Precio TTC: {precio:.2f}")
-        return precio
-
-    else:
+    if response.status_code != 200:
         logger.warning(f"Error en la consulta a Dolibarr: {response.status_code} - {response.text}")
-        ui.notify(f"Error en la consulta a Dolibarr: {response.status_code} - {response.text}", type="error")
+        return None, _error_http(response, idProducto)
 
-    return None
+    try:
+        producto = response.json()
+        precio = float(producto.get("price_ttc", 0) or 0)
+    except (ValueError, AttributeError):
+        logger.warning(f"Respuesta inesperada de Dolibarr: {response.text[:200]}")
+        return None, "Dolibarr devolvió una respuesta que no es un producto. Revise la URL en Configurar."
+
+    logger.info(f"Producto {producto.get('id')} {producto.get('ref', '')}: precio TTC {precio:.2f}")
+    return precio, None
 
 
-def actualizarPrecioDolibarr(urlServidor: str, token: str, idProducto: str, precio: float) -> bool:
+def actualizarPrecioDolibarr(urlServidor: str, token: str, idProducto, precio: float) -> str | None:
     """Actualizar el precio de un producto en Dolibarr.
 
-    Args:
-        urlServidor(str): URL base del servidor Dolibarr (ej. http://localhost/dolibarr)
-        token(str): Clave API de Dolibarr
-        idProducto(str): ID del producto a actualizar en Dolibarr
-        precio(float): Nuevo precio a establecer en Dolibarr
+    No toca la interfaz: se puede ejecutar fuera del event loop (run.io_bound).
+
     Returns:
-        bool: True si la actualización fue exitosa, False en caso contrario.
+        str | None: None si se actualizó, o el mensaje de error.
     """
 
     endpoint = f"{urlServidor.rstrip('/')}/api/index.php/products/{idProducto}"
     headers = {"DOLAPIKEY": token, "Content-Type": "application/json"}
     data = {"price": precio, "price_ttc": precio}
 
-    response = requests.put(endpoint, headers=headers, json=data)
+    try:
+        response = requests.put(endpoint, headers=headers, json=data, timeout=TIMEOUT_DOLIBARR)
+    except requests.Timeout:
+        return f"Dolibarr no respondió en {TIMEOUT_DOLIBARR} s. El precio no se actualizó."
+    except requests.RequestException as exc:
+        logger.warning(f"Error de conexión con Dolibarr {endpoint}: {exc}")
+        return "No se pudo conectar con Dolibarr. El precio no se actualizó."
 
-    if response.status_code == 200:
-        logger.info(f"Precio actualizado correctamente en Dolibarr: {precio:.2f}")
-        ui.notify(f"Precio actualizado correctamente en Dolibarr: {precio:.2f}", type="success")
-        return True
-    else:
+    if response.status_code != 200:
         logger.warning(f"Error al actualizar el precio en Dolibarr: {response.status_code} - {response.text}")
-        ui.notify(f"Error al actualizar el precio en Dolibarr: {response.status_code} - {response.text}", type="error")
+        return _error_http(response, idProducto)
 
-    return False
+    logger.info(f"Precio actualizado correctamente en Dolibarr: {precio:.2f}")
+    return None

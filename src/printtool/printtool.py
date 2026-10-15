@@ -428,7 +428,9 @@ class printtool:
                                 validation=self.validar_numero_no_negativo,
                                 step=1,
                             ).props("rounded outlined dense")
-                            ui.button(on_click=self.actualizarEnsamblado, icon="send")
+                            ui.button(on_click=self.actualizarEnsamblado, icon="send").props(
+                                'aria-label="Guardar tiempo de ensamblado"'
+                            )
                             self.textoTiempoEnsamblado.on("keydown.enter", self.actualizarEnsamblado)
 
                     with ui.column().classes("justify-center items-center"):
@@ -444,8 +446,12 @@ class printtool:
                                 step=1,
                             ).props("rounded outlined dense")
                             self.inputPrecioFilamento.props(f"prefix={self.símboloMoneda}")
-                            ui.button(on_click=self.actualizarFilamentoProyecto, icon="send")
-                            ui.button(on_click=self.borrarFilamentoProyecto, icon="delete").props("flat")
+                            ui.button(on_click=self.actualizarFilamentoProyecto, icon="send").props(
+                                'aria-label="Guardar filamento del proyecto"'
+                            )
+                            ui.button(on_click=self.borrarFilamentoProyecto, icon="delete").props(
+                                'flat aria-label="Usar filamento del sistema"'
+                            )
                         ui.label("Deja el precio vacío o bórralo para usar el filamento del sistema.").classes(
                             "text-xs text-grey"
                         )
@@ -688,7 +694,9 @@ class printtool:
             with tabla.add_slot("bottom-row"):
                 with tabla.row():
                     with tabla.cell():
-                        ui.button(on_click=self.agregarCostoExtra, icon="add").props("flat fab-mini")
+                        ui.button(on_click=self.agregarCostoExtra, icon="add").props(
+                            'flat fab-mini aria-label="Agregar costo extra"'
+                        )
                     with tabla.cell():
                         self.textoExtra = ui.input("Extra")
                     with tabla.cell():
@@ -702,7 +710,9 @@ class printtool:
                     ):
                         ui.icon("search")
             with tabla.add_slot("top-left"):
-                ui.button(icon="delete", color="red", on_click=self.borrarExtra).bind_visibility_from(
+                ui.button(icon="delete", color="red", on_click=self.borrarExtra).props(
+                    'aria-label="Borrar costo extra seleccionado"'
+                ).bind_visibility_from(
                     self.tablaDataExtras, "selected", backward=lambda val: bool(val)
                 )
 
@@ -1109,7 +1119,7 @@ class printtool:
                     ui.space()
 
                     with ui.button(icon="menu") as botón:
-                        botón.props("color=bg-teal-700")
+                        botón.props('color=bg-teal-700 aria-label="Menú"')
                         with ui.menu() as menu:
                             menu.classes("min-w-48 text-center")
 

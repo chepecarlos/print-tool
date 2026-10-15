@@ -1,5 +1,8 @@
 import os
 
+# WebKitGTK falla con "Could not create GBM EGL display" en algunos drivers
+os.environ.setdefault("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
+
 import typer
 
 from printtool.MiLibrerias import ConfigurarLogging

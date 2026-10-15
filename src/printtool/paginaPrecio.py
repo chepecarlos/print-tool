@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from nicegui import ui
+from nicegui import run, ui
 
 if TYPE_CHECKING:
     from printtool.printtool import printtool
@@ -89,7 +89,9 @@ def cargarPaginaPrecio(tool: "printtool") -> None:
                         validation=tool.validar_numero_no_negativo,
                         step=0.01,
                     ).classes("min-w-48")
-                    ui.button(on_click=tool.actualizarPrecios, icon="check").props("color=positive").classes("h-full")
+                    ui.button(on_click=tool.actualizarPrecios, icon="check").props(
+                        'color=positive aria-label="Aplicar nuevo precio"'
+                    ).classes("h-full")
                     tool.textoVenta.on("keydown.enter", tool.actualizarPrecios)
 
         ui.separator().classes("my-4 w-full")
@@ -97,25 +99,59 @@ def cargarPaginaPrecio(tool: "printtool") -> None:
             with ui.column().classes("justify-center items-center gap-2"):
                 ui.label("Dolibarr ERP").classes("font-bold")
 
-                def _consultar():
-                    precio = consultarPrecioDolibarr(
-                        tool.urlDolibarr,
-                        tool.tokenDolibarr,
-                        tool.idProductoDolibarr,
-                    )
-                    if precio is not None:
-                        tool.textoVenta.set_value(precio)
-                        tool.actualizarPrecios()
+                def _id_producto_valido() -> bool:
+                    if not tool.idProductoDolibarr:
                         ui.notify(
-                            f"Precio consultado desde Dolibarr: {tool.símboloMoneda}{precio:.2f}", type="positive"
+                            "Este modelo no tiene ID de producto de Dolibarr. Asígnelo en la pestaña Modelo.",
+                            type="warning",
                         )
+                        return False
+                    return True
 
-                def _actualizar():
-                    actualizarPrecioDolibarr(
-                        tool.urlDolibarr,
-                        tool.tokenDolibarr,
-                        tool.idProductoDolibarr,
-                        tool.precioVentaFinal,
+                async def _consultar():
+                    if not _id_producto_valido():
+                        return
+                    boton_consultar.props("loading")
+                    boton_actualizar.disable()
+                    try:
+                        precio, error = await run.io_bound(
+                            consultarPrecioDolibarr,
+                            tool.urlDolibarr,
+                            tool.tokenDolibarr,
+                            tool.idProductoDolibarr,
+                        )
+                    finally:
+                        boton_consultar.props(remove="loading")
+                        boton_actualizar.enable()
+                    if error:
+                        ui.notify(error, type="negative")
+                        return
+                    tool.textoVenta.set_value(precio)
+                    tool.actualizarPrecios()
+                    ui.notify(f"Precio consultado desde Dolibarr: {tool.símboloMoneda}{precio:.2f}", type="positive")
+
+                async def _actualizar():
+                    if not _id_producto_valido():
+                        return
+                    boton_actualizar.props("loading")
+                    boton_consultar.disable()
+                    try:
+                        error = await run.io_bound(
+                            actualizarPrecioDolibarr,
+                            tool.urlDolibarr,
+                            tool.tokenDolibarr,
+                            tool.idProductoDolibarr,
+                            tool.precioVentaFinal,
+                        )
+                    finally:
+                        boton_actualizar.props(remove="loading")
+                        boton_consultar.enable()
+                    if error:
+                        ui.notify(error, type="negative")
+                        return
+                    ui.notify(
+                        f"Precio actualizado en Dolibarr: {tool.símboloMoneda}{tool.precioVentaFinal:.2f}",
+                        type="positive",
                     )
 
                 with ui.row().classes("items-center gap-2"):

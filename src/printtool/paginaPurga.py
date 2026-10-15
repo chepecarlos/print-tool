@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Callable
 
-from nicegui import ui
+from nicegui import run, ui
 
 from printtool.MiLibrerias import ObtenerArchivo, SalvarValor, ConfigurarLogging
 from printtool.utilidades.miOctoprint import consultarFilamentosOctoprint
@@ -491,17 +491,14 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
 
         catalogo_manual = _normalizar_catalogo(data_global.get("catalogo_filamentos", []))
 
-        filamentos_spoolman = []
+        # Spoolman se consulta después de mostrar la página (ver carga_inicial_spoolman):
+        # NiceGUI corta la construcción a los 3 s y una consulta lenta dejaba la ventana congelada.
         spoolman_activo = False
+        consultando_spoolman = bool(tool.urlSpoolman)
         octoprint_activo = False
         slots_octoprint = ["", "", "", "", ""]
-        if tool.urlSpoolman:
-            consulta_spoolman = consultarFilamentosSpoolman(tool.urlSpoolman)
-            if isinstance(consulta_spoolman, list) and len(consulta_spoolman) > 0:
-                filamentos_spoolman = consulta_spoolman
-                spoolman_activo = True
 
-        fuente_filamentos = filamentos_spoolman if spoolman_activo else catalogo_manual
+        fuente_filamentos = catalogo_manual
         index_filamentos = _filamento_por_id(fuente_filamentos)
 
         slots = _normalizar_slots(data_proyecto.get("purga_slots", data_global.get("purga_slots")))
@@ -559,7 +556,9 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                             value=maquina_id_inicial if maquina_id_inicial else None,
                         ).classes("w-60")
 
-                        boton_cargar_octoprint = ui.button(icon="cloud_download").props("outline")
+                        boton_cargar_octoprint = ui.button(icon="cloud_download").props(
+                            'outline aria-label="Cargar filamento desde OctoPrint"'
+                        )
                         boton_cargar_octoprint.tooltip("Cargar filamento desde OctoPrint")
 
                         if len(opciones_maquinas) == 0:
@@ -567,10 +566,14 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                             boton_cargar_octoprint.disable()
 
                     with ui.row().classes("items-center gap-2"):
-                        boton_guardar_slots_proyecto = ui.button(icon="save").props("outline")
+                        boton_guardar_slots_proyecto = ui.button(icon="save").props(
+                            'outline aria-label="Guardar selecciones en proyecto"'
+                        )
                         boton_guardar_slots_proyecto.tooltip("Guardar selecciones en proyecto")
 
-                        boton_limpiar_slots_proyecto = ui.button(icon="delete_sweep").props("outline color=negative")
+                        boton_limpiar_slots_proyecto = ui.button(icon="delete_sweep").props(
+                            'outline color=negative aria-label="Limpiar slots del proyecto"'
+                        )
                         boton_limpiar_slots_proyecto.tooltip("Limpiar slots del proyecto")
 
             with ui.card().classes("w-full max-w-6xl"):
@@ -637,10 +640,14 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                                 ui.element("div").classes("w-28 h-10")
                                 continue
 
-                            entrada = ui.number(
-                                value=valor,
-                                step=1,
-                            ).classes("w-28")
+                            entrada = (
+                                ui.number(
+                                    value=valor,
+                                    step=1,
+                                )
+                                .classes("w-28")
+                                .props(f'aria-label="Purga en mm³ de Color {fila} a Color {columna}"')
+                            )
 
                             inputs_matriz[(fila, columna)] = entrada
 
@@ -725,6 +732,12 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 estado_fuente.set_text(f"Fuente activa: OctoPrint ({len(fuente_filamentos)} filamentos)")
             elif spoolman_activo:
                 estado_fuente.set_text(f"Fuente activa: Spoolman ({len(fuente_filamentos)} filamentos)")
+            elif consultando_spoolman:
+                estado_fuente.set_text("Consultando Spoolman…")
+            elif tool.urlSpoolman:
+                estado_fuente.set_text(
+                    f"Spoolman no disponible: usando catálogo manual ({len(catalogo_manual)} filamentos)"
+                )
             else:
                 estado_fuente.set_text(f"Fuente activa: Catalogo manual ({len(catalogo_manual)} filamentos)")
 
@@ -935,7 +948,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                     type="warning",
                 )
 
-        def sincronizar_pruga_spoolman(matriz_guardar: dict[str, dict[str, float | None]]) -> None:
+        async def sincronizar_pruga_spoolman(matriz_guardar: dict[str, dict[str, float | None]]) -> None:
             if not spoolman_activo or not tool.urlSpoolman:
                 return
 
@@ -983,7 +996,9 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                     exitos += 1
                     continue
 
-                guardado = actualizarPrugaFilamentoSpoolman(tool.urlSpoolman, filament_id, valor_nuevo)
+                guardado = await run.io_bound(
+                    actualizarPrugaFilamentoSpoolman, tool.urlSpoolman, filament_id, valor_nuevo
+                )
                 if guardado:
                     origen_info["pruga"] = valor_nuevo
                     exitos += 1
@@ -1005,7 +1020,18 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                     type="warning",
                 )
 
-        def guardar_en_global() -> None:
+        async def sincronizar_con_botones_bloqueados(matriz_guardar: dict[str, dict[str, float | None]]) -> None:
+            # Evita doble envío mientras se escriben los filamentos en Spoolman.
+            botones = (boton_guardar_proyecto, boton_guardar_global, boton_cargar_global)
+            for boton in botones:
+                boton.disable()
+            try:
+                await sincronizar_pruga_spoolman(matriz_guardar)
+            finally:
+                for boton in botones:
+                    boton.enable()
+
+        async def guardar_en_global() -> None:
             matriz_guardar = leer_matriz_desde_ui()
             if matriz_guardar is None:
                 return
@@ -1013,8 +1039,8 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             SalvarValor(ARCHIVO_PURGA_GLOBAL, "purga_slots", list(slots))
             SalvarValor(ARCHIVO_PURGA_GLOBAL, "purga_mmu3", matriz_guardar)
             SalvarValor(ARCHIVO_PURGA_GLOBAL, "catalogo_filamentos", list(catalogo_manual))
-            sincronizar_pruga_spoolman(matriz_guardar)
             ui.notify("Configuracion de purga guardada en global", type="positive")
+            await sincronizar_con_botones_bloqueados(matriz_guardar)
 
         def guardar_slots_en_proyecto() -> None:
             SalvarValor(tool.archivoInfo, "purga_slots", list(slots), local=False)
@@ -1032,15 +1058,15 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             actualizar_selectores_par()
             ui.notify("Slots de filamentos del proyecto limpiados", type="info")
 
-        def guardar_en_proyecto() -> None:
+        async def guardar_en_proyecto() -> None:
             matriz_guardar = leer_matriz_desde_ui()
             if matriz_guardar is None:
                 return
 
             SalvarValor(tool.archivoInfo, "purga_slots", list(slots), local=False)
             SalvarValor(tool.archivoInfo, "purga_mmu3", matriz_guardar, local=False)
-            sincronizar_pruga_spoolman(matriz_guardar)
             ui.notify("Configuracion de purga guardada en el proyecto", type="positive")
+            await sincronizar_con_botones_bloqueados(matriz_guardar)
 
         def cargar_global() -> None:
             nonlocal fuente_filamentos, index_filamentos
@@ -1063,8 +1089,8 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             refrescar_ui_filamentos()
             ui.notify("Valores cargados desde la configuracion global", type="info")
 
-        def recargar_spoolman() -> None:
-            nonlocal spoolman_activo, octoprint_activo, fuente_filamentos, index_filamentos
+        async def recargar_spoolman(notificar: bool = True) -> None:
+            nonlocal spoolman_activo, octoprint_activo, fuente_filamentos, index_filamentos, consultando_spoolman
 
             if not tool.urlSpoolman:
                 ui.notify("No hay URL de Spoolman configurada. Use /config.", type="warning")
@@ -1075,22 +1101,34 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 refrescar_ui_filamentos()
                 return
 
-            consulta = consultarFilamentosSpoolman(tool.urlSpoolman)
+            consultando_spoolman = True
+            actualizar_estado_fuente()
+            boton_recargar_spoolman.props("loading")
+            try:
+                consulta = await run.io_bound(consultarFilamentosSpoolman, tool.urlSpoolman)
+            finally:
+                consultando_spoolman = False
+                boton_recargar_spoolman.props(remove="loading")
+
             if isinstance(consulta, list) and len(consulta) > 0:
                 spoolman_activo = True
                 octoprint_activo = False
                 fuente_filamentos = consulta
                 index_filamentos = _filamento_por_id(fuente_filamentos)
-                ui.notify(f"Spoolman activo: {len(consulta)} filamentos disponibles", type="positive")
+                if notificar:
+                    ui.notify(f"Spoolman activo: {len(consulta)} filamentos disponibles", type="positive")
             else:
                 spoolman_activo = False
                 octoprint_activo = False
                 fuente_filamentos = catalogo_manual
                 index_filamentos = _filamento_por_id(fuente_filamentos)
-                ui.notify("Spoolman no disponible, usando catalogo manual", type="warning")
+                if notificar:
+                    ui.notify(
+                        f"Spoolman no responde en {tool.urlSpoolman}. Se usa el catálogo manual.", type="warning"
+                    )
 
             refrescar_ui_filamentos()
-            cargar_desde_spoolman_si_hay_datos(notificar=True)
+            cargar_desde_spoolman_si_hay_datos(notificar=notificar)
 
         def agregar_manual() -> None:
             nonlocal fuente_filamentos, index_filamentos
@@ -1159,7 +1197,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             refrescar_ui_filamentos()
             ui.notify("Filamento eliminado del catalogo manual", type="info")
 
-        def registrar_fallo_par(origen: int, destino: int, valor_fallo: float) -> None:
+        async def registrar_fallo_par(origen: int, destino: int, valor_fallo: float) -> None:
             slot_origen = slots[origen - 1]
             origen_info = index_filamentos.get(slot_origen) if slot_origen else None
             if origen_info is None:
@@ -1201,7 +1239,13 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             mapa_actual[id_destino] = valores_destino
             valor_nuevo = _serializar_pruga_negativa_compacto(mapa_actual)
 
-            guardado = actualizarPrugaNegativaFilamentoSpoolman(tool.urlSpoolman, filament_id, valor_nuevo)
+            boton_aplicar_par.props("loading")
+            try:
+                guardado = await run.io_bound(
+                    actualizarPrugaNegativaFilamentoSpoolman, tool.urlSpoolman, filament_id, valor_nuevo
+                )
+            finally:
+                boton_aplicar_par.props(remove="loading")
             if not guardado:
                 ui.notify("No se pudo guardar el valor fallido en Spoolman", type="negative")
                 return
@@ -1210,7 +1254,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
             input_par_fallo.set_value(None)
             ui.notify(f"Fallo registrado: {origen} -> {destino} = {valor_fallo:.2f} mmu3", type="positive")
 
-        def aplicar_par() -> None:
+        async def aplicar_par() -> None:
             logger.debug(
                 f"aplicar_par | origen_raw={selector_origen.value!r} "
                 f"destino_raw={selector_destino.value!r} valor_raw={input_par.value!r} "
@@ -1268,7 +1312,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 ui.notify(f"Actualizado: {origen} -> {destino} = {valor:.2f} mmu3", type="positive")
 
             if valor_fallo is not None:
-                registrar_fallo_par(origen, destino, valor_fallo)
+                await registrar_fallo_par(origen, destino, valor_fallo)
 
             actualizar_label_fallidos_par()
 
@@ -1323,7 +1367,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 return None
             return maquinas_por_id.get(maquina_id)
 
-        def cargar_filamentos_desde_octoprint() -> None:
+        async def cargar_filamentos_desde_octoprint() -> None:
             nonlocal octoprint_activo, fuente_filamentos, index_filamentos, slots_octoprint
 
             maquina = _maquina_actual()
@@ -1331,7 +1375,11 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                 ui.notify("Seleccione una maquina valida", type="warning")
                 return
 
-            consulta = consultarFilamentosOctoprint(maquina)
+            boton_cargar_octoprint.props("loading")
+            try:
+                consulta = await run.io_bound(consultarFilamentosOctoprint, maquina)
+            finally:
+                boton_cargar_octoprint.props(remove="loading")
             if not consulta.get("ok"):
                 error = str(consulta.get("error") or "No se pudo consultar OctoPrint")
                 ui.notify(error, type="negative")
@@ -1412,7 +1460,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
         boton_guardar_slots_proyecto.on_click(guardar_slots_en_proyecto)
         boton_limpiar_slots_proyecto.on_click(limpiar_slots_proyecto)
         boton_cargar_global.on_click(cargar_global)
-        boton_recargar_spoolman.on_click(recargar_spoolman)
+        boton_recargar_spoolman.on_click(lambda: recargar_spoolman())
         boton_cargar_octoprint.on_click(cargar_filamentos_desde_octoprint)
         boton_agregar_manual.on_click(agregar_manual)
         boton_borrar_manual.on_click(borrar_manual)
@@ -1428,6 +1476,11 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
 
         refrescar_ui_filamentos()
         aplicar_matriz_a_ui(matriz)
-        cargar_desde_spoolman_si_hay_datos(notificar=False)
+
+        async def carga_inicial_spoolman() -> None:
+            await recargar_spoolman(notificar=False)
+
+        if tool.urlSpoolman:
+            ui.timer(0, carga_inicial_spoolman, once=True)
 
         add_interface(interface, current_page="/purga")
