@@ -121,7 +121,7 @@ class inventario:
 
             with tabla.add_slot("top-right"):
                 with (
-                    ui.input(placeholder="Buscar").props("type=search").bind_value(tabla, "filter").add_slot("append")
+                    ui.input(placeholder="Buscar").props('type=search aria-label="Buscar proyectos"').bind_value(tabla, "filter").add_slot("append")
                 ):
                     ui.icon("search")
             with tabla.add_slot("top-left"):

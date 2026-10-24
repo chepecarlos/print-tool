@@ -417,30 +417,30 @@ class printtool:
 
                 with ui.row().classes("w-full justify-center items-center"):
                     with ui.column().classes("justify-center items-center"):
-                        with ui.row().props("outlined dense"):
+                        with ui.row():
                             self.textoTiempoEnsamblado = ui.number(
                                 label="Tiempo de ensamblaje",
                                 value=self.tiempoEnsamblado,
                                 validation=self.validar_numero_no_negativo,
                                 step=1,
-                            ).props("outlined dense suffix=min")
+                            ).props("suffix=min")
                             ui.button(on_click=self.actualizarEnsamblado, icon="send").props(
                                 'aria-label="Guardar tiempo de ensamblado"'
                             )
                             self.textoTiempoEnsamblado.on("keydown.enter", self.actualizarEnsamblado)
 
                     with ui.column().classes("justify-center items-center"):
-                        with ui.row().props("outlined dense"):
+                        with ui.row():
                             self.inputNombreFilamento = ui.input(
                                 label="Filamento del modelo",
                                 value=self.nombreFilamentoProyecto,
-                            ).props("outlined dense").classes("w-56")
+                            ).classes("w-56")
                             self.inputPrecioFilamento = ui.number(
                                 label="Precio por kg",
                                 value=self.precioFilamentoProyecto or None,
                                 validation=self.validar_numero_opcional_no_negativo,
                                 step=1,
-                            ).props("outlined dense").classes("w-44")
+                            ).classes("w-44")
                             self.inputPrecioFilamento.props(f"prefix={self.símboloMoneda}")
                             ui.button(on_click=self.actualizarFilamentoProyecto, icon="send").props(
                                 'aria-label="Guardar filamento del proyecto"'
@@ -449,7 +449,7 @@ class printtool:
                                 'flat color=rojo-texto aria-label="Usar el filamento predeterminado"'
                             )
                         ui.label("Deje el precio vacío para usar el filamento predeterminado (Menú › Configurar).").classes(
-                            "text-xs text-grey"
+                            "text-xs text-tinta-secundaria"
                         )
 
                 infoArchivo = [
@@ -690,7 +690,7 @@ class printtool:
                 with tabla.add_slot("top-right"):
                     with (
                         ui.input(placeholder="Buscar")
-                        .props("type=search")
+                        .props('type=search aria-label="Buscar extras"')
                         .bind_value(tabla, "filter")
                         .add_slot("append")
                     ):
@@ -976,12 +976,16 @@ class printtool:
         SalvarValor(self.archivoInfo, "filamento_seleccionado", self.filamentoSeleccionado, local=False)
 
     def agregarCostoExtra(self):
-        extra = self.textoExtra.value
+        extra = (self.textoExtra.value or "").strip()
         precio = self.textoCostoExtra.value
 
-        if extra and precio is not None:
-            agregarValor(self.archivoExtras, extra, precio, False)
-            self.cargarCostos()
+        if not extra or precio is None or precio < 0:
+            ui.notify("Escriba el nombre del extra y un precio de 0 o más.", type="warning")
+            return
+        agregarValor(self.archivoExtras, extra, precio, False)
+        self.textoExtra.value = ""
+        self.textoCostoExtra.value = None
+        self.cargarCostos()
 
     def borrarExtra(self):
         """Borrar costo extra seleccionado"""
@@ -1049,9 +1053,9 @@ class printtool:
         @ui.page("/")
         def paginaInicio():
 
-            with ui.tabs().style("padding: 0px") as tabs:
-                tabs.classes("w-full text-white")
-                tabs.style("padding: 0px")
+            # las pestañas viven en la barra superior (agregarInterface las mueve ahí)
+            with ui.tabs().props("inline-label indicator-color=white outside-arrows mobile-arrows") as tabs:
+                tabs.classes("text-white max-w-full")
                 self.tabInfo = ui.tab("Info", icon="home")
                 self.tabCosto = ui.tab("Costos", icon="view_in_ar")
                 self.tabPrecio = ui.tab("Precio", icon="paid")
@@ -1076,9 +1080,9 @@ class printtool:
                         row.classes("w-full justify-center items-center")
                         self.cargarGuiActualizar()
 
-            agregarInterface(interface, current_page="/")
+            agregarInterface(interface, current_page="/", barra=tabs)
 
-        def agregarInterface(interface: bool, current_page: str = ""):
+        def agregarInterface(interface: bool, current_page: str = "", barra=None):
 
             aplicarTema()
 
@@ -1111,13 +1115,19 @@ class printtool:
             with ui.header() as cabecera:
                 cabecera.classes("bg-primary items-center justify-between")
                 cabecera.style("min-height: 48px; padding: 0 8px 0 16px")
-                with ui.row().classes("w-full items-center no-wrap"):
+                # app y modelo a la izquierda, pestañas centradas con márgenes automáticos (ceden a 0 si falta
+                # espacio y el nombre del modelo se recorta), menú a la derecha
+                with ui.row().classes("w-full items-center no-wrap gap-4"):
                     ui.label("PrintTool").classes("text-h5 shrink-0")
-                    ui.space()
-                    ui.label(self.nombreModelo).bind_text_from(self, "nombreModelo").classes("text-h6 truncate min-w-0").props('role=heading aria-level=1')
-                    ui.space()
+                    ui.label(self.nombreModelo).bind_text_from(self, "nombreModelo").classes(
+                        "text-subtitle1 truncate min-w-0"
+                    ).props("role=heading aria-level=1")
 
-                    with ui.button(icon="menu") as botón:
+                    centro = ui.element("div").classes("mx-auto min-w-0")
+                    if barra is not None:
+                        barra.move(centro)
+
+                    with ui.button(icon="menu").classes("shrink-0") as botón:
                         botón.props('flat color=white aria-label="Menú"')
                         with ui.menu() as menu:
                             menu.classes("min-w-48 text-center")

@@ -82,7 +82,7 @@ def cargarPaginaPrecio(tool: "printtool") -> None:
         with ui.row().classes("w-full justify-center"):
             with ui.column().classes("justify-center items-center gap-2"):
                 ui.label("Fijar precio de venta").classes("text-subtitle1").props('role=heading aria-level=2')
-                with ui.row().props("rounded outlined").classes("items-center gap-2"):
+                with ui.row().classes("items-center gap-2"):
                     tool.textoVenta = ui.number(
                         label="Precio de venta final",
                         value=tool.precioVentaFinal,

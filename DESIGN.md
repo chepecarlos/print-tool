@@ -175,7 +175,7 @@ Una paleta grafito con una voz teal y tres colores semánticos; todo lo demás e
 
 ## Layout
 
-Lienzo de escritorio: ventana nativa de 1024×786, contenido centrado con un ancho máximo de 72rem (`max-w-6xl`) en páginas de trabajo y 42rem (`max-w-2xl`) en fichas de cálculo. Barra superior y pie fijos; entre ellos, pestañas (Info, Costos, Precio, Modelo) y paneles a lo ancho.
+Lienzo de escritorio: ventana nativa de 1024×786, contenido centrado con un ancho máximo de 72rem (`max-w-6xl`) en páginas de trabajo y 42rem (`max-w-2xl`) en fichas de cálculo. Barra superior y pie fijos. Las pestañas (Info, Costos, Precio, Modelo) van dentro de la barra; debajo, los paneles a lo ancho.
 
 El ritmo usa tres pasos: 8px dentro de un grupo (`spacing.sm`), 12px entre controles relacionados (`spacing.md`) y 16px como relleno de panel y separación entre secciones (`spacing.lg`). Las fichas de cálculo son rejillas de dos columnas (etiqueta | valor) o tres (concepto | referencia | final).
 
@@ -212,8 +212,8 @@ Compactos y con borde.
 - **Error / Disabled:** mensaje de validación en español bajo el campo ("Campo obligatorio", "Debe ser menor que 100 %"); deshabilitado con la opacidad por defecto de Quasar y una línea en tinta secundaria que explique por qué.
 
 ### Navigation
-- **Barra superior:** fondo teal del taller; "PrintTool" a la izquierda en Headline, nombre del modelo centrado en Title, menú (icono `menu`, flat, texto blanco) a la derecha. El menú lista Inicio, Cambiar Proyecto, Configurar, Cálculo Purga MMU y, separado, Salir en rojo texto.
-- **Pestañas:** iconos Material sobre la etiqueta, texto blanco y subrayado blanco en la activa, sobre la página grafito.
+- **Barra superior:** fondo teal del taller, 48px. A la izquierda, "PrintTool" en Headline y el nombre del modelo en Subtitle (se recorta con «…» si falta espacio). En el centro, las pestañas de la página, si las hay. A la derecha, el menú (icono `menu`, flat, texto blanco). El menú lista Inicio, Cambiar Proyecto, Configurar, Cálculo Purga MMU y, separado, Salir en rojo texto.
+- **Pestañas:** viven dentro de la barra superior, con el icono al lado de la etiqueta (`inline-label`, 48px de alto), texto blanco y subrayado blanco en la activa. Se centran con márgenes automáticos; si no caben, muestran flechas de desplazamiento y nunca empujan el menú fuera de la barra.
 - **Pie:** fondo teal, "Creado por ChepeCarlos" centrado en blanco (compromiso de marca).
 
 ### Ficha de cálculo (signature)

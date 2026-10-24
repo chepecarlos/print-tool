@@ -2,6 +2,8 @@
 
 from nicegui import ui
 
+from printtool.utilidades.token_search_select import TokenSearchSelect
+
 # Roles de Quasar + colores propios; los propios generan clases text-<nombre> / bg-<nombre>
 # y se pueden usar como color=<nombre> en botones.
 COLORES = {
@@ -14,7 +16,11 @@ COLORES = {
     "verde_precio": "#4ADE80",
     "ambar_costo": "#FACC15",
     "rojo_texto": "#F87171",
+    "tinta_secundaria": "#9E9E9E",
 }
+
+# Relleno de una muestra de color sin filamento asignado.
+MUESTRA_VACIA = "#222222"
 
 CSS = """
 /* Teal sobre grafito: como texto el teal del taller no llega a 4.5:1, se usa teal claro. */
@@ -31,6 +37,12 @@ body { font-variant-numeric: tabular-nums; caret-color: #4DB6AC; }
 }
 
 * { scrollbar-width: thin; scrollbar-color: #4A4A4A #121212; }
+
+/* Pestañas sobre la barra teal: con la opacidad por defecto (0.85) el texto queda en 4.4:1. */
+.q-header .q-tab--inactive { opacity: 0.9; }
+
+/* Borde de las muestras de color: se ven incluso cuando el filamento es negro. */
+.border-muestra { border-color: #6B7280; }
 """
 
 _cssRegistrado = False
@@ -41,5 +53,9 @@ def aplicarTema() -> None:
     global _cssRegistrado
     if not _cssRegistrado:
         ui.add_css(CSS, shared=True)
+        # Todos los campos con borde y compactos; las subclases copian los props al definirse,
+        # por eso se fija en cada clase.
+        for campo in (ui.input, ui.number, ui.select, ui.textarea, TokenSearchSelect):
+            campo.default_props("outlined dense")
         _cssRegistrado = True
     ui.colors(**COLORES)

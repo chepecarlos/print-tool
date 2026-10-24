@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Callable
 
 from nicegui import run, ui
 
+from printtool.tema import MUESTRA_VACIA
 from printtool.MiLibrerias import ObtenerArchivo, SalvarValor, ConfigurarLogging
 from printtool.utilidades.miOctoprint import consultarFilamentosOctoprint
 from printtool.utilidades.miSpoolman import (
@@ -319,7 +320,7 @@ def _color_hex_slot(slot_idx: int, slots: list[str], index_filamentos: dict[str,
         color_hex = str(index_filamentos[slot_id].get("color_hex") or "").strip()
         if color_hex.startswith("#") and len(color_hex) in (4, 7):
             return color_hex
-    return "#222222"
+    return MUESTRA_VACIA
 
 
 def _id_corto_filamento(slot_id: str) -> str:
@@ -517,7 +518,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
         with ui.column().classes("w-full items-center"):
             ui.label("Purga por cambio de color (MMU3)").classes("text-h6").props('role=heading aria-level=1')
 
-            estado_fuente = ui.label("").classes("text-sm text-grey")
+            estado_fuente = ui.label("").classes("text-sm text-tinta-secundaria")
 
             with ui.row().classes("w-full max-w-6xl justify-center"):
                 boton_recargar_spoolman = ui.button("Recargar Spoolman", icon="refresh").props("outline")
@@ -530,7 +531,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                         with ui.row().classes("w-full items-center no-wrap gap-2"):
                             indicador = (
                                 ui.element("div")
-                                .classes("w-8 h-8 rounded border border-gray-500 shrink-0")
+                                .classes("w-8 h-8 rounded border border-muestra shrink-0")
                                 .style(f"background-color: {_color_hex_slot(idx, slots, index_filamentos)};")
                             )
                             indicadores_color[idx] = indicador
@@ -585,7 +586,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                     with ui.row().classes("items-center gap-2"):
                         indicador_par_origen = (
                             ui.element("div")
-                            .classes("w-8 h-8 rounded border border-gray-500 shrink-0")
+                            .classes("w-8 h-8 rounded border border-muestra shrink-0")
                             .style(f"background-color: {_color_hex_slot(0, slots, index_filamentos)};")
                         )
                         selector_origen = ui.select(opciones_par_inicial, label="Desde", value="1").classes("w-64")
@@ -593,7 +594,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                     with ui.row().classes("items-center gap-2"):
                         indicador_par_destino = (
                             ui.element("div")
-                            .classes("w-8 h-8 rounded border border-gray-500 shrink-0")
+                            .classes("w-8 h-8 rounded border border-muestra shrink-0")
                             .style(f"background-color: {_color_hex_slot(1, slots, index_filamentos)};")
                         )
                         selector_destino = ui.select(opciones_par_inicial, label="Hacia", value="2").classes("w-64")
@@ -622,7 +623,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                             with ui.row().classes("items-center justify-center gap-2"):
                                 indicadores_encabezado[col] = (
                                     ui.element("div")
-                                    .classes("w-4 h-4 rounded border border-gray-500 shrink-0")
+                                    .classes("w-4 h-4 rounded border border-muestra shrink-0")
                                     .style(f"background-color: {_color_hex_slot(col - 1, slots, index_filamentos)};")
                                 )
                                 labels_encabezado[col] = ui.label(f"Color {col}").classes("font-bold text-center")
@@ -631,7 +632,7 @@ def registraPaginaPurga(tool: "printtool", add_interface: Callable[[bool, str], 
                             with ui.row().classes("items-center gap-2"):
                                 indicadores_fila[fila] = (
                                     ui.element("div")
-                                    .classes("w-4 h-4 rounded border border-gray-500 shrink-0")
+                                    .classes("w-4 h-4 rounded border border-muestra shrink-0")
                                     .style(f"background-color: {_color_hex_slot(fila - 1, slots, index_filamentos)};")
                                 )
                                 labels_fila[fila] = ui.label(f"Color {fila}").classes("font-bold")
