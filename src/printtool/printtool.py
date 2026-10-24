@@ -29,6 +29,13 @@ from printtool.tema import aplicarTema
 logger = ConfigurarLogging(__name__)
 
 
+def formatearHoras(horas: float) -> str:
+    """Formatea horas decimales como 'X h Y m', o 'D d X h Y m' si pasa de 24 horas."""
+    dias, minutos = divmod(int(horas * 60), 24 * 60)
+    texto = f"{minutos // 60} h {minutos % 60} m"
+    return f"{dias} d {texto}" if dias else texto
+
+
 class printtool:
     """Clase principal para la herramienta de emprendimiento de impresión 3D"""
 
@@ -316,7 +323,7 @@ class printtool:
             {
                 "key": "totalHoras",
                 "humano": "Tiempo de impresión",
-                "formato": lambda x: f"{int(x)} h {int((x - int(x)) * 60)} m",
+                "formato": formatearHoras,
             },
             {"key": "precioVentaFinal", "humano": "Precio de venta", "formato": lambda x: f"{self.símboloMoneda} {x:.2f}"},
         ]
@@ -346,12 +353,12 @@ class printtool:
                 {
                     "key": "totalHoras",
                     "humano": "Tiempo de impresión",
-                    "formato": lambda x: f"{int(x)} h {int((x - int(x)) * 60)} m",
+                    "formato": formatearHoras,
                 },
                 {
                     "key": "tiempoEnsamblado",
                     "humano": "Tiempo de ensamblaje",
-                    "formato": lambda x: f"{int(x/60)} h {int(x - int(x/60)*60)} m",
+                    "formato": lambda x: formatearHoras(x / 60),
                 },
             ]
 
@@ -768,9 +775,6 @@ class printtool:
                     materialPorUnidad = materialPorUnidad / infoGcode.cantidad
                     logger.info(f"Por pieza: {tiempoPorUnidad:.2f} horas, {materialPorUnidad:.2f} gramos.")
 
-                horas = int(tiempoPorUnidad)
-                minutos = int((tiempoPorUnidad - horas) * 60)
-                tiempo_formateado = f"{horas} h {minutos} m"
                 infoGcode.costo = (materialPorUnidad * self.costoGramo + tiempoPorUnidad * costoHoraImpresion) * (
                     1 + float(self.errorFabricacion) / 100
                 )
@@ -780,7 +784,7 @@ class printtool:
                         "nombre": nombreArchivo,
                         "archivo": archivo,
                         "material": f"{materialPorUnidad:.2f} g",
-                        "tiempo": f"{tiempo_formateado}",
+                        "tiempo": formatearHoras(tiempoPorUnidad),
                         "cantidad": infoGcode.cantidad,
                         "costo": f"{self.símboloMoneda} {infoGcode.costo:.2f}",
                     }
@@ -811,13 +815,12 @@ class printtool:
             )
             return
 
-        minutosTotal = int((self.totalHoras - int(self.totalHoras)) * 60)
         dataArchivo.append(
             {
                 "nombre": "Total por unidad",
                 "archivo": "",
                 "material": f"{self.totalGramos:.2f} g",
-                "tiempo": f"{int(self.totalHoras)} h {minutosTotal} m",
+                "tiempo": formatearHoras(self.totalHoras),
             }
         )
 
