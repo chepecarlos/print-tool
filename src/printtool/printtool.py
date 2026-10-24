@@ -36,6 +36,11 @@ def formatearHoras(horas: float) -> str:
     return f"{dias} d {texto}" if dias else texto
 
 
+def formatearGramos(gramos: float) -> str:
+    """Formatea gramos como 'X.XX g', o 'X.XX kg' desde 1000 g."""
+    return f"{gramos / 1000:.2f} kg" if gramos >= 1000 else f"{gramos:.2f} g"
+
+
 class printtool:
     """Clase principal para la herramienta de emprendimiento de impresión 3D"""
 
@@ -319,7 +324,7 @@ class printtool:
             {"key": "inventario", "humano": "Inventario", "formato": lambda x: f"{x}"},
             {"key": "skuModelo", "humano": "SKU", "formato": lambda x: f"{x}"},
             # {"key": "Material", "humano": "Material", "formato": "PLA"},
-            {"key": "totalGramos", "humano": "Filamento total", "formato": lambda x: f"{x:.2f} g"},
+            {"key": "totalGramos", "humano": "Filamento total", "formato": formatearGramos},
             {
                 "key": "totalHoras",
                 "humano": "Tiempo de impresión",
@@ -349,7 +354,7 @@ class printtool:
                     "humano": "Filamento",
                     "formato": lambda x: x if x else "Predeterminado (sin nombre)",
                 },
-                {"key": "totalGramos", "humano": "Filamento por unidad", "formato": lambda x: f"{x:.2f} g"},
+                {"key": "totalGramos", "humano": "Filamento por unidad", "formato": formatearGramos},
                 {
                     "key": "totalHoras",
                     "humano": "Tiempo de impresión",
@@ -783,7 +788,7 @@ class printtool:
                         "copias": infoGcode.copias,
                         "nombre": nombreArchivo,
                         "archivo": archivo,
-                        "material": f"{materialPorUnidad:.2f} g",
+                        "material": formatearGramos(materialPorUnidad),
                         "tiempo": formatearHoras(tiempoPorUnidad),
                         "cantidad": infoGcode.cantidad,
                         "costo": f"{self.símboloMoneda} {infoGcode.costo:.2f}",
@@ -819,7 +824,7 @@ class printtool:
             {
                 "nombre": "Total por unidad",
                 "archivo": "",
-                "material": f"{self.totalGramos:.2f} g",
+                "material": formatearGramos(self.totalGramos),
                 "tiempo": formatearHoras(self.totalHoras),
             }
         )
