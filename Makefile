@@ -18,6 +18,15 @@ install:
 		&& echo "✓ printtool instalado y disponible en el PATH" \
 		|| (echo "✗ printtool no quedó funcional en el PATH" >&2; exit 1)
 
+# acción de clic derecho en Nemo (Cinnamon); se fija la ruta absoluta porque Nemo no hereda el PATH de la terminal
+NEMO_DIR = $(HOME)/.local/share/nemo/actions
+
+.PHONY: nemo
+nemo:
+	@PT=$$(command -v printtool) || { echo "✗ printtool no está en el PATH, ejecuta antes 'make install'" >&2; exit 1; }; \
+	mkdir -p $(NEMO_DIR) && sed "s|@PRINTTOOL@|$$PT|" nemo/printtool.nemo_action > $(NEMO_DIR)/printtool.nemo_action \
+		&& echo "✓ Acción de Nemo instalada usando $$PT (reinicia Nemo con: nemo -q)"
+
 # entorno de desarrollo: venv local con el paquete editable y las dependencias de test
 VENV = venv
 

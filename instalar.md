@@ -38,4 +38,12 @@ sudo apt install python3-tk
 
 ```bash
 pipx install . --force
+```
+
+## Menú de clic derecho en Nemo (opcional)
+Agrega "Abrir PrintTool aquí" al hacer clic derecho dentro de una carpeta en Nemo (Cinnamon)
+
+```bash
+make nemo
+nemo -q
 ``` 

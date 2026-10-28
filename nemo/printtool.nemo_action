@@ -1,0 +1,9 @@
+[Nemo Action]
+Active=true
+Name=Abrir PrintTool aquí
+Comment=Calcular costos de impresión 3D en esta carpeta.
+Exec=sh -c 'cd "$1" && exec @PRINTTOOL@ >"$HOME/.cache/printtool.log" 2>&1' _ %P
+Icon-Name=printer
+Selection=none
+Extensions=dir;
+Quote=double

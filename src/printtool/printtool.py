@@ -427,22 +427,25 @@ class printtool:
                                     lambda x, transform_func=item["formato"]: transform_func(x),
                                 ).classes("text-right" + (" font-bold text-lg text-ambar-costo" if is_total else ""))
 
-                with ui.row().classes("w-full justify-center items-center"):
-                    with ui.column().classes("justify-center items-center"):
-                        with ui.row():
+                # mismo layout que las tablas de arriba: grupos con título, alineados arriba
+                with ui.row().classes("w-full justify-center items-start gap-x-16 gap-y-6 mt-4"):
+                    with ui.column().classes("items-start gap-2"):
+                        ui.label("Ensamblaje").classes("text-subtitle1").props('role=heading aria-level=2')
+                        with ui.row().classes("items-center gap-2"):
                             self.textoTiempoEnsamblado = ui.number(
                                 label="Tiempo de ensamblaje",
                                 value=self.tiempoEnsamblado,
                                 validation=self.validar_numero_no_negativo,
                                 step=1,
-                            ).props("suffix=min")
+                            ).props("suffix=min").classes("w-44")
                             ui.button(on_click=self.actualizarEnsamblado, icon="send").props(
                                 'aria-label="Guardar tiempo de ensamblado"'
                             )
                             self.textoTiempoEnsamblado.on("keydown.enter", self.actualizarEnsamblado)
 
-                    with ui.column().classes("justify-center items-center"):
-                        with ui.row():
+                    with ui.column().classes("items-start gap-2"):
+                        ui.label("Filamento del proyecto").classes("text-subtitle1").props('role=heading aria-level=2')
+                        with ui.row().classes("items-center gap-2"):
                             self.inputNombreFilamento = ui.input(
                                 label="Filamento del modelo",
                                 value=self.nombreFilamentoProyecto,
