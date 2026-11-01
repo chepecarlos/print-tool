@@ -293,6 +293,7 @@ class printtool:
 
         self.totalGramos = float(self.infoCostos.get("total_gramos", 0))
         self.totalHoras = float(self.infoCostos.get("total_horas", 0))
+        self.coloresTotales: dict[str, float] = self.infoCostos.get("colores") or {}
 
         self.costoFilamento = float(self.infoCostos.get("precio_filamento", 0))
 
@@ -341,6 +342,24 @@ class printtool:
                     item["key"],
                     lambda x, transform_func=item["formato"]: transform_func(x),
                 ).classes("text-right")
+
+            ui.label("Colores").classes("self-start")
+            self.mostrarColores()
+
+    @ui.refreshable_method
+    def mostrarColores(self) -> None:
+        """Lista de colores del modelo con sus gramos por unidad, de mayor a menor."""
+        if not self.coloresTotales:
+            ui.label("Calcule en Costos").classes("text-right text-tinta-secundaria")
+            return
+        with ui.column().classes("items-end gap-1"):
+            for color, gramos in sorted(self.coloresTotales.items(), key=lambda x: -x[1]):
+                with ui.row().classes("items-center gap-2 no-wrap"):
+                    ui.element("span").classes("inline-block w-4 h-4 rounded-full border border-gray-400").style(
+                        f"background: {color}"
+                    ).props(f'role=img aria-label="{color}"')
+                    ui.label(color).classes("font-mono text-sm")
+                    ui.label(formatearGramos(gramos)).classes("w-20 text-right")
 
     def cargarGuiCostos(self) -> None:
         """Cargar la interfaz gráfica de usuario para la pestaña de costos."""
@@ -501,6 +520,12 @@ class printtool:
                         "label": "Tiempo",
                         "field": "tiempo",
                     },
+                    {
+                        "name": "colores",
+                        "label": "Colores",
+                        "field": "colores",
+                        "align": "left",
+                    },
                 ]
 
                 # nombres de archivo largos: QTable hace scroll horizontal dentro de sí misma, no la página
@@ -510,6 +535,18 @@ class printtool:
                     row_key="nombre",
                     pagination=5,
                 ).classes("w-full")
+                self.tablaDataGcode.add_slot(
+                    "body-cell-colores",
+                    r"""
+                    <q-td :props="props">
+                        <span v-for="c in props.value" :key="c.color" role="img" :aria-label="c.color + ' ' + c.gramos"
+                              class="inline-block w-4 h-4 rounded-full mr-1 border border-gray-400 align-middle"
+                              :style="{background: c.color}">
+                            <q-tooltip>{{ c.color }} · {{ c.gramos }}</q-tooltip>
+                        </span>
+                    </q-td>
+                    """,
+                )
 
                 infoCostos = [
                     {
@@ -752,6 +789,7 @@ class printtool:
 
         self.totalGramos = 0
         self.totalHoras = 0
+        self.coloresTotales = {}
 
         dataArchivo: list[dict] = []
 
@@ -795,10 +833,17 @@ class printtool:
                         "tiempo": formatearHoras(tiempoPorUnidad),
                         "cantidad": infoGcode.cantidad,
                         "costo": f"{self.símboloMoneda} {infoGcode.costo:.2f}",
+                        "colores": [
+                            {"color": c, "gramos": formatearGramos(g / infoGcode.cantidad)}
+                            for c, g in infoGcode.colores
+                        ],
                     }
                 )
                 self.totalGramos += materialPorUnidad * infoGcode.copias
                 self.totalHoras += tiempoPorUnidad * infoGcode.copias
+                for color, gramos in infoGcode.colores:
+                    gramosUnidad = gramos / infoGcode.cantidad * infoGcode.copias
+                    self.coloresTotales[color] = round(self.coloresTotales.get(color, 0) + gramosUnidad, 2)
 
         if dataArchivo == []:
             logger.warning("No se encontraron archivos G-code en la carpeta del proyecto.")
@@ -806,6 +851,7 @@ class printtool:
 
         SalvarValor(self.archivoInfo, "total_gramos", self.totalGramos, local=False)
         SalvarValor(self.archivoInfo, "total_horas", self.totalHoras, local=False)
+        SalvarValor(self.archivoInfo, "colores", self.coloresTotales, local=False)
 
         return dataArchivo
 
@@ -834,6 +880,7 @@ class printtool:
 
         self.tablaDataGcode.rows = dataArchivo
         self.tablaDataGcode.update()
+        self.mostrarColores.refresh()
 
     def cargarDataGcode(self, nombre: str, archivo: str, tipoArchivo: str) -> dataGcode:
         """Cargar datos de un archivo G-code.
@@ -873,6 +920,14 @@ class printtool:
                 infoGcode.material = sum(valores)
                 if len(valores) > 1:
                     self.multiMaterial = True
+
+                # .bgcode solo trae extruder_colour en texto plano (filament_colour va comprimido) y sin "; "
+                buscarColores = re.search(r"^;?\s*filament_colour\s*=\s*(.+)$", lineasDocumento, re.M) or re.search(
+                    r"^;?\s*extruder_colour\s*=\s*(.+)$", lineasDocumento, re.M
+                )
+                if buscarColores:
+                    colores = [c.strip() for c in buscarColores.group(1).split(";")]
+                    infoGcode.colores = [(c, g) for c, g in zip(colores, valores) if g > 0]
 
             if infoGcode.material == 0:
                 buscarGramos = re.search(r"(\d+)g", nombre)

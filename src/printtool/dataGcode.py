@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -13,8 +13,8 @@ class dataGcode:
     "Tiempo de impresión en horas"
     tipo: str = "pla"
     "Tipo de material"
-    color: str = "no"
-    "Color del material"
+    colores: list[tuple[str, float]] = field(default_factory=list)
+    "Colores usados como (hex, gramos), solo los extrusores con material > 0"
     cantidad: int = 1
     "Cantidad de veces que se repiten las piezas en el modelo"
     copias: int = 1

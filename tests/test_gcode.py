@@ -32,3 +32,24 @@ def test_cargarDataGcode_usa_nombre_como_respaldo(tmp_path):
     assert info.cantidad == 2
     assert info.materialPorPieza == 10
     assert pt.multiMaterial is False
+
+
+def test_cargarDataGcode_extrae_colores_usados(tmp_path):
+    archivo = tmp_path / "multi.gcode"
+    archivo.write_text(
+        "; filament used [g] = 0.00, 17.49, 0.00, 23.58\n"
+        "; filament_colour = #FFFFFF;#00B423;#FFFA13;#993F00\n"
+    )
+
+    info = printtool().cargarDataGcode("multi.gcode", str(archivo), ".gcode")
+
+    assert info.colores == [("#00B423", 17.49), ("#993F00", 23.58)]
+
+
+def test_cargarDataGcode_colores_bgcode_usa_extruder_colour(tmp_path):
+    archivo = tmp_path / "pieza.bgcode"
+    archivo.write_text("extruder_colour=#4D4D4D;#E5E5E5;#FF0000\nfilament used [g]=19.36, 0.00, 2.14\n")
+
+    info = printtool().cargarDataGcode("pieza", str(archivo), ".bgcode")
+
+    assert info.colores == [("#4D4D4D", 19.36), ("#FF0000", 2.14)]
