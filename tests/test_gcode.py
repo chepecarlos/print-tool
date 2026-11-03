@@ -53,3 +53,16 @@ def test_cargarDataGcode_colores_bgcode_usa_extruder_colour(tmp_path):
     info = printtool().cargarDataGcode("pieza", str(archivo), ".bgcode")
 
     assert info.colores == [("#4D4D4D", 19.36), ("#FF0000", 2.14)]
+
+
+def test_cargarDataGcode_extruder_colour_manda_sobre_filament_colour(tmp_path):
+    archivo = tmp_path / "prusa.gcode"
+    archivo.write_text(
+        "; filament used [g] = 0.00, 0.00, 28.57, 1.64\n"
+        '; extruder_colour = #E5E5E5;#3B3B3B;"";#FFFF00\n'
+        "; filament_colour = #FF8000;#FF8000;#FF8000;#FF8000\n"
+    )
+
+    info = printtool().cargarDataGcode("prusa.gcode", str(archivo), ".gcode")
+
+    assert info.colores == [("#FF8000", 28.57), ("#FFFF00", 1.64)]

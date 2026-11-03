@@ -4,6 +4,7 @@ import codecs
 import re
 import shutil
 from pathlib import Path
+from itertools import zip_longest
 
 from printtool.dataGcode import dataGcode
 from printtool.costosImpresora import dataImpresora
@@ -921,13 +922,17 @@ class printtool:
                 if len(valores) > 1:
                     self.multiMaterial = True
 
-                # .bgcode solo trae extruder_colour en texto plano (filament_colour va comprimido) y sin "; "
-                buscarColores = re.search(r"^;?\s*filament_colour\s*=\s*(.+)$", lineasDocumento, re.M) or re.search(
-                    r"^;?\s*extruder_colour\s*=\s*(.+)$", lineasDocumento, re.M
-                )
-                if buscarColores:
-                    colores = [c.strip() for c in buscarColores.group(1).split(";")]
-                    infoGcode.colores = [(c, g) for c, g in zip(colores, valores) if g > 0]
+                # como PrusaSlicer: extruder_colour manda y filament_colour cubre los vacíos
+                # (.bgcode solo trae extruder_colour en texto plano y sin "; ")
+                def listaColores(clave: str) -> list[str]:
+                    buscar = re.search(rf"^;?\s*{clave}\s*=\s*(.+)$", lineasDocumento, re.M)
+                    return [c.strip().strip('"') for c in buscar.group(1).split(";")] if buscar else []
+
+                colores = [
+                    e or f
+                    for e, f in zip_longest(listaColores("extruder_colour"), listaColores("filament_colour"), fillvalue="")
+                ]
+                infoGcode.colores = [(c, g) for c, g in zip(colores, valores) if g > 0 and c]
 
             if infoGcode.material == 0:
                 buscarGramos = re.search(r"(\d+)g", nombre)
