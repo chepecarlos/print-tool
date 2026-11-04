@@ -28,7 +28,7 @@ Lee los datos directamente del G-code/bgcode laminado (o del nombre del archivo,
 
 ## Operating Context
 
-- Aplicación de escritorio: NiceGUI servido localmente dentro de una ventana nativa (pywebview/GTK) en Linux. También CLI con Typer (`printtool`, `printtool productos listar`, `printtool --inventario`).
+- Aplicación de escritorio: NiceGUI servido localmente dentro de una ventana nativa (pywebview/GTK) en Linux. También CLI con Typer (`printtool`, `printtool productos listar`, `printtool inventario`).
 - Se abre sobre la carpeta de un proyecto; un modo inventario recorre carpetas y lista todos los proyectos.
 - Configuración global en `~/.config/printtool/` (costos, purga, impresoras); datos por proyecto en `.printtool/`.
 - Servicios externos: Dolibarr (API con `DOLAPIKEY`), Spoolman (campo personalizado `pruga` en filamentos), OctoPrint (`/api/settings`, plugin Spoolman).

@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 # WebKitGTK falla con "Could not create GBM EGL display" en algunos drivers
 os.environ.setdefault("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
@@ -27,7 +28,6 @@ app.add_typer(productos.app, name="productos", help="📦  Consulta productos y 
 @app.callback()
 def main(
     ctx: typer.Context,
-    inventario_flag: bool = typer.Option(False, "--inventario", "-i", help="Sistema de inventario"),
     depuracion: bool = typer.Option(False, "--depuracion", "-d", help="Activa la depuración"),
 ) -> None:
     """printtool — Herramientas para emprendimiento de impresión 3D."""
@@ -35,17 +35,23 @@ def main(
     if ctx.invoked_subcommand is not None:
         return
 
-    if inventario_flag:
-        logger.info("Empezando Inventario de Print-Tool")
-        inventarioProyectos = inventario()
-        inventarioProyectos.listaProyectos = printtool.buscarProyectos(os.getcwd())
-        inventarioProyectos.cargarGUI()
-    else:
-        logger.info("Empezando Print-Tool")
-        app_printtool = printtool()
-        app_printtool.iniciarSistema()
-        app_printtool.cargarGui(True)
-        app_printtool.iniciarGui()
+    logger.info("Empezando Print-Tool")
+    app_printtool = printtool()
+    app_printtool.iniciarSistema()
+    app_printtool.cargarGui(True)
+    app_printtool.iniciarGui()
+
+
+@app.command("inventario")
+def comandoInventario(
+    ruta: Path = typer.Argument(Path.cwd(), help="Carpeta raíz donde buscar proyectos recursivamente."),
+) -> None:
+    """🗃️  Abre el inventario de todos los proyectos dentro de la carpeta."""
+
+    logger.info("Empezando Inventario de Print-Tool")
+    inventarioProyectos = inventario()
+    inventarioProyectos.listaProyectos = printtool.buscarProyectos(str(ruta))
+    inventarioProyectos.cargarGUI()
 
 
 if __name__ == "__main__":
