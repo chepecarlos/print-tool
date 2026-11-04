@@ -65,10 +65,22 @@ def test_abrir_proyecto_reinicia_estado(tmp_path, monkeypatch):
     assert pt.costoUnidad == 0
 
 
-def test_inventario_no_reescribe_y_cuenta_omitidos(tmp_path):
+def test_inventario_no_reescribe_y_cuenta_omitidos(tmp_path, monkeypatch):
     import os
 
+    from printtool import inventario as modInventario
+    from printtool import printtool as modPrinttool
     from printtool.inventario import inventario
+
+    # costos.md se lee una vez por escaneo, no una por proyecto
+    lecturasCostos = []
+    for modulo in (modInventario, modPrinttool):
+        original = modulo.ObtenerArchivo
+        monkeypatch.setattr(
+            modulo,
+            "ObtenerArchivo",
+            lambda a, *x, _o=original, **k: (lecturasCostos.append(a) if "costos" in str(a) else None) or _o(a, *x, **k),
+        )
 
     def proyecto(nombre, cuerpo):
         carpeta = tmp_path / nombre / ".printtool"
@@ -86,10 +98,11 @@ def test_inventario_no_reescribe_y_cuenta_omitidos(tmp_path):
     inv.listaProyectos = [bueno, suelto, roto]
     inv.cargarDatos()  # primera lectura: crea extras.md
     antes = os.path.getmtime(info)
-    filas, _, sinDolibarr, conError = inv.cargarDatos()
+    filas, sinDolibarr, conError = inv.cargarDatos()
 
     assert os.path.getmtime(info) == antes
     assert [f["nombre"] for f in filas] == ["Llavero"]
     assert filas[0]["precio"] == 5.0
     assert sinDolibarr == 1
     assert conError == [roto]
+    assert len(lecturasCostos) == 2  # una por cada llamada a cargarDatos

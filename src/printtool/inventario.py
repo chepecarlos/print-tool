@@ -2,9 +2,9 @@ import json
 import subprocess
 import sys
 
-from nicegui import ui
+from nicegui import Client, run, ui
 
-from printtool.MiLibrerias import ConfigurarLogging
+from printtool.MiLibrerias import ConfigurarLogging, ObtenerArchivo
 from printtool.printtool import printtool
 from printtool.tema import aplicarTema
 
@@ -51,16 +51,20 @@ class inventario:
             return
         ui.notify(f"Abriendo {nombre}…")
 
-    def cargarDatos(self) -> tuple[list[dict], str, int, list[str]]:
+    def cargarDatos(self, infoBase: dict | None = None) -> tuple[list[dict], int, list[str]]:
         """Leer info.md de cada proyecto.
 
+        Args:
+            infoBase: costos.md ya leído; si falta se lee aquí, una sola vez para todos.
+
         Returns:
-            Filas de la tabla, símbolo de moneda, cuántos proyectos no están vinculados
-            a Dolibarr y las carpetas que no se pudieron leer.
+            Filas de la tabla, cuántos proyectos no están vinculados a Dolibarr
+            y las carpetas que no se pudieron leer.
         """
 
+        if infoBase is None:
+            infoBase = ObtenerArchivo(printtool.archivoConfig) or {}
         dataInfo = []
-        simbolo = "$"
         sinDolibarr = 0
         conError: list[str] = []
         for folderProyecto in self.listaProyectos:
@@ -68,7 +72,7 @@ class inventario:
             proyectoPrint.folderProyecto = folderProyecto
             # un info.md roto (colores o precio mal escritos a mano) salta esa fila, no la página
             try:
-                proyectoPrint.iniciarSistema()
+                proyectoPrint.iniciarSistema(infoBase)
 
                 # igual que `productos listar`: es producto si está vinculado a Dolibarr
                 if not proyectoPrint.idProductoDolibarr:
@@ -92,16 +96,14 @@ class inventario:
                 conError.append(folderProyecto)
                 continue
 
-            # el símbolo viene de la configuración global, igual para todos los proyectos
-            simbolo = proyectoPrint.símboloMoneda
             dataInfo.append(fila)
-        return dataInfo, simbolo, sinDolibarr, conError
+        return dataInfo, sinDolibarr, conError
 
     def cargarGUI(self):
         "Cargar la interfaz gráfica de usuario (GUI) del sistema de inventario."
 
         @ui.page("/")
-        def paginaInventario():
+        async def paginaInventario(client: Client):
             aplicarTema()
 
             with ui.header() as cabecera:
@@ -112,7 +114,12 @@ class inventario:
                         "role=heading aria-level=1"
                     )
 
-            dataInfo, simbolo, sinDolibarr, conError = self.cargarDatos()
+            # costos.md una sola vez: da el símbolo de moneda y se comparte con cada proyecto
+            infoBase = ObtenerArchivo(printtool.archivoConfig)
+            if infoBase is None:
+                logger.error("Falta data/costos.md; se usan valores por defecto")
+                infoBase = {}
+            simbolo = infoBase.get("simbolo", "$")
 
             columnaInfo = [
                 {
@@ -143,13 +150,15 @@ class inventario:
             area = ui.column().classes("w-full max-w-6xl mx-auto gap-2")
             with area, ui.table(
                 columns=columnaInfo,
-                rows=dataInfo,
+                rows=[],
                 selection="single",
                 row_key="ruta",
                 pagination=8,
             ) as tabla:
                 tabla.classes("w-full")
                 tabla.props(
+                    # hide-no-data mientras carga: el icono de aviso del estado vacío parecería un error
+                    'loading hide-no-data '
                     'no-data-label="Ningún proyecto de esta carpeta tiene ID de producto en Dolibarr. '
                     'Asígnelo en la pestaña Modelo de cada proyecto." '
                     'no-results-label="Ningún producto coincide con la búsqueda"'
@@ -206,10 +215,29 @@ class inventario:
                         tabla, "selected", backward=lambda val: bool(val)
                     )
 
-            # lo que no aparece en la tabla también se cuenta: el inventario no esconde proyectos
             def proyectos(n: int) -> str:
                 return f"{n} {'proyecto' if n == 1 else 'proyectos'}"
 
+            with area:
+                etiquetaResumen = (
+                    ui.label(f"Leyendo {proyectos(len(self.listaProyectos))}…")
+                    .classes("text-sm text-tinta-secundaria")
+                    .props('aria-live="polite"')
+                )
+
+            with ui.footer() as pie:
+                pie.classes("bg-primary")
+                pie.style("min-height: 32px; padding: 4px 16px")
+                with ui.row().classes("w-full justify-center items-center"):
+                    ui.label("Creado por ChepeCarlos").classes("text-white")
+
+            # la ventana se muestra antes de leer: con cientos de proyectos el escaneo tarda segundos
+            await client.connected()
+            dataInfo, sinDolibarr, conError = await run.io_bound(self.cargarDatos, infoBase)
+            tabla.rows = dataInfo
+            tabla.props(remove="loading hide-no-data")
+
+            # lo que no aparece en la tabla también se cuenta: el inventario no esconde proyectos
             resumen = f"{len(dataInfo)} {'producto' if len(dataInfo) == 1 else 'productos'}"
             omitidos = []
             if sinDolibarr:
@@ -219,8 +247,7 @@ class inventario:
             if omitidos:
                 verbo = "lista" if sinDolibarr + len(conError) == 1 else "listan"
                 resumen += f". No se {verbo} " + " y ".join(omitidos) + "."
-            with area:
-                ui.label(resumen).classes("text-sm text-tinta-secundaria").props('aria-live="polite"')
+            etiquetaResumen.text = resumen
             if conError:
                 nombres = ", ".join(c.rstrip("/").split("/")[-1] for c in conError[:3])
                 if len(conError) > 3:
@@ -235,12 +262,6 @@ class inventario:
                     # cerrar en tinta oscura: el teal de close_button sobre amarillo no llega a 4.5:1
                     actions=[{"label": "Cerrar", "color": "black"}],
                 )
-
-            with ui.footer() as pie:
-                pie.classes("bg-primary")
-                pie.style("min-height: 32px; padding: 4px 16px")
-                with ui.row().classes("w-full justify-center items-center"):
-                    ui.label("Creado por ChepeCarlos").classes("text-white")
 
         # native busca un puerto libre solo, igual que la ventana principal
         ui.run(

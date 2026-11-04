@@ -195,7 +195,12 @@ class printtool:
                 proyectos.append(carpeta)
         return proyectos
 
-    def iniciarSistema(self) -> None:
+    def iniciarSistema(self, infoBase: dict | None = None) -> None:
+        """Cargar configuración global y datos del proyecto.
+
+        Args:
+            infoBase: costos.md ya leído; el inventario lo lee una vez y lo comparte entre proyectos.
+        """
 
         self.configurarData()
 
@@ -206,7 +211,7 @@ class printtool:
             SalvarArchivo(self.archivoExtras, data)
             logger.info(f"Creando data base de {self.archivoExtras}")
 
-        self.infoBase = ObtenerArchivo(self.archivoConfig)
+        self.infoBase = infoBase if infoBase is not None else ObtenerArchivo(self.archivoConfig)
         if self.infoBase is None:
             logger.error("Error falta información para calculo de costos")
             self.infoBase = dict()
