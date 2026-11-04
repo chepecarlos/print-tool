@@ -356,7 +356,7 @@ class printtool:
         with ui.column().classes("items-end gap-1"):
             for color, gramos in sorted(self.coloresTotales.items(), key=lambda x: -x[1]):
                 with ui.row().classes("items-center gap-2 no-wrap"):
-                    ui.element("span").classes("inline-block w-4 h-4 rounded-full border border-gray-400").style(
+                    ui.element("span").classes("inline-block w-4 h-4 rounded border border-muestra").style(
                         f"background: {color}"
                     ).props(f'role=img aria-label="{color}"')
                     ui.label(color).classes("font-mono text-sm")
@@ -541,7 +541,7 @@ class printtool:
                     r"""
                     <q-td :props="props">
                         <span v-for="c in props.value" :key="c.color" role="img" :aria-label="c.color + ' ' + c.gramos"
-                              class="inline-block w-4 h-4 rounded-full mr-1 border border-gray-400 align-middle"
+                              class="inline-block w-4 h-4 rounded mr-1 border border-muestra align-middle"
                               :style="{background: c.color}">
                             <q-tooltip>{{ c.color }} · {{ c.gramos }}</q-tooltip>
                         </span>

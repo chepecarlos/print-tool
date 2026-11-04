@@ -57,5 +57,7 @@ def aplicarTema() -> None:
         # por eso se fija en cada clase.
         for campo in (ui.input, ui.number, ui.select, ui.textarea, TokenSearchSelect):
             campo.default_props("outlined dense")
+        # Flat-At-Rest: las tablas se separan por tono (grafito-panel), no por sombra.
+        ui.table.default_props("flat")
         _cssRegistrado = True
     ui.colors(**COLORES)
