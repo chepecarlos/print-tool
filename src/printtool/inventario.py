@@ -24,7 +24,7 @@ class inventario:
         """Abrir un proyecto en su propia ventana de PrintTool.
 
         Args:
-            proyecto (list[dict]): Fila seleccionada de la tabla.
+            proyecto (list[dict]): Fila de la tabla, dentro de una lista.
         """
         if not proyecto:
             return
@@ -128,6 +128,8 @@ class inventario:
                     "field": "nombre",
                     "align": "left",
                     "sortable": True,
+                    # orden natural en español: "Maceta 2" antes que "Maceta 10", sin importar tildes ni mayúsculas
+                    ":sort": "(a, b) => String(a).localeCompare(String(b), 'es', {numeric: true, sensitivity: 'base'})",
                     # nombres largos se recortan con «…»; el texto completo sigue en el DOM
                     "classes": "ellipsis",
                     "style": "max-width: 24rem",
@@ -144,6 +146,7 @@ class inventario:
                     ":format": f"value => {json.dumps(simbolo + ' ')} + Number(value).toFixed(2)",
                 },
                 {"name": "inventario", "label": "Inventario", "field": "inventario", "align": "right", "sortable": True},
+                {"name": "abrir", "label": "", "field": "ruta", "align": "right"},
             ]
 
             # ancho de página de trabajo (DESIGN.md): la tabla no se estira en pantallas anchas
@@ -151,9 +154,9 @@ class inventario:
             with area, ui.table(
                 columns=columnaInfo,
                 rows=[],
-                selection="single",
                 row_key="ruta",
-                pagination=8,
+                # orden alfabético al abrir: el orden de las carpetas en disco no dice nada
+                pagination={"rowsPerPage": 8, "sortBy": "nombre"},
             ) as tabla:
                 tabla.classes("w-full")
                 tabla.props(
@@ -163,18 +166,27 @@ class inventario:
                     'Asígnelo en la pestaña Modelo de cada proyecto." '
                     'no-results-label="Ningún producto coincide con la búsqueda"'
                 )
-                # doble clic sobre la fila = seleccionar + Abrir proyecto
+                # abrir es navegación, no acción sobre una selección: botón en cada fila,
+                # alcanzable con Tab en el orden de lectura; doble clic como atajo de ratón
                 tabla.on("row-dblclick", lambda e: self.abrirProyecto([e.args[1]]))
+                tabla.on("abrir", lambda e: self.abrirProyecto([e.args]))
                 tabla.add_slot(
-                    "body-selection",
+                    "body-cell-abrir",
                     """
-                    <q-checkbox v-model="props.selected" dense :aria-label="'Seleccionar ' + props.row.nombre" />
+                    <q-td :props="props" auto-width>
+                        <q-btn flat dense icon="open_in_new" color="teal-4"
+                            :aria-label="'Abrir ' + props.row.nombre"
+                            @click="() => $parent.$emit('abrir', props.row)">
+                            <q-tooltip>{{ 'Abrir ' + props.row.nombre }}</q-tooltip>
+                        </q-btn>
+                    </q-td>
                     """,
                 )
                 tabla.add_slot(
                     "body-cell-colores",
                     """
                     <q-td :props="props">
+                        <span v-if="!props.value.length" class="text-tinta-secundaria">Sin calcular</span>
                         <span v-for="color in props.value" :key="color" :title="color" role="img" :aria-label="'Color ' + color"
                             class="inline-block w-4 h-4 rounded border border-muestra q-mr-xs align-middle"
                             :style="{background: color}"></span>
@@ -210,10 +222,6 @@ class inventario:
                         .add_slot("append")
                     ):
                         ui.icon("search")
-                with tabla.add_slot("top-left"):
-                    ui.button("Abrir proyecto", on_click=lambda: self.abrirProyecto(tabla.selected)).bind_visibility_from(
-                        tabla, "selected", backward=lambda val: bool(val)
-                    )
 
             def proyectos(n: int) -> str:
                 return f"{n} {'proyecto' if n == 1 else 'proyectos'}"
